@@ -1,0 +1,106 @@
+{% extends "base.html" %}
+
+{% block content %}
+<section class="page-head">
+    <div>
+        <p class="section-tag">Execução</p>
+        <h2>{% if cumprimento %}Editar cumprimento{% else %}Novo cumprimento de tarefa{% endif %}</h2>
+    </div>
+</section>
+
+<section class="card">
+    {% if cumprimento %}
+    <form method="post" class="form-grid two-cols">
+        <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
+        <label>
+            Adolescente
+            <select name="adolescente_id" required>
+                <option value="">Selecione</option>
+                {% set adolescente_id = cumprimento.adolescente_id if cumprimento else '' %}
+                {% for adolescente in adolescentes %}
+                <option value="{{ adolescente.id }}" {% if adolescente_id == adolescente.id %}selected{% endif %}>
+                    {{ adolescente.nome }} - {{ adolescente.matricula }}
+                </option>
+                {% endfor %}
+            </select>
+        </label>
+        <label>
+            Tarefa
+            <select name="atividade_id" required>
+                <option value="">Selecione</option>
+                {% set atividade_id = cumprimento.atividade_id if cumprimento else '' %}
+                {% for atividade in atividades %}
+                <option value="{{ atividade.id }}" {% if atividade_id == atividade.id %}selected{% endif %}>
+                    {{ atividade.nome }} ({{ atividade.pontos }} pts)
+                </option>
+                {% endfor %}
+            </select>
+        </label>
+        <label>
+            Data
+            <input type="date" name="data_cumprimento" value="{{ cumprimento.data_cumprimento if cumprimento else today }}" required>
+        </label>
+        <label>
+            Cumpriu?
+            <select name="cumpriu" required>
+                {% set cumpriu = cumprimento.cumpriu if cumprimento else 1 %}
+                <option value="1" {% if cumpriu == 1 %}selected{% endif %}>Sim</option>
+                <option value="0" {% if cumpriu == 0 %}selected{% endif %}>Não</option>
+            </select>
+        </label>
+        <label class="full-span">
+            Observações
+            <textarea name="observacoes" rows="4" maxlength="200">{{ cumprimento.observacoes if cumprimento else '' }}</textarea>
+        </label>
+        <div class="form-actions">
+            <button type="submit">{% if cumprimento %}Salvar registro{% else %}Registrar cumprimento{% endif %}</button>
+        </div>
+    </form>
+    {% else %}
+    <form method="post" class="form-grid two-cols">
+        <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
+        <label>
+            Adolescente
+            <select name="adolescente_id" required>
+                <option value="">Selecione</option>
+                {% for adolescente in adolescentes %}
+                <option value="{{ adolescente.id }}">
+                    {{ adolescente.nome }} - {{ adolescente.matricula }}
+                </option>
+                {% endfor %}
+            </select>
+        </label>
+        <label>
+            Data
+            <input type="date" name="data_cumprimento" value="{{ today }}" required>
+        </label>
+        <label>
+            Status aplicado ao lote
+            <select name="cumpriu" required>
+                <option value="1" selected>Sim</option>
+                <option value="0">Não</option>
+            </select>
+        </label>
+        <div class="full-span">
+            <span class="field-title">Atividades do mesmo lançamento</span>
+            <div class="activity-picker">
+                {% for atividade in atividades %}
+                <label class="activity-option">
+                    <input type="checkbox" name="atividade_ids" value="{{ atividade.id }}">
+                    <span>{{ atividade.nome }}</span>
+                    <strong>{{ atividade.pontos }} pts</strong>
+                </label>
+                {% endfor %}
+            </div>
+        </div>
+        <label class="full-span">
+            Observações
+            <textarea name="observacoes" rows="4" maxlength="200" placeholder="Opcional. Esta observação será aplicada a todas as atividades selecionadas."></textarea>
+        </label>
+        <div class="form-actions">
+            <button type="submit">Registrar atividades em lote</button>
+        </div>
+    </form>
+    {% endif %}
+</section>
+{% endblock %}

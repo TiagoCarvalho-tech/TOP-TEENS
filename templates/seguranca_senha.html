@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+
+{% block content %}
+<section class="page-head">
+    <div>
+        <p class="section-tag">Segurança</p>
+        <h2>Alterar senha do acesso</h2>
+        <p class="muted">Use uma senha longa e exclusiva para o ambiente real.</p>
+    </div>
+</section>
+
+<section class="card">
+    <form method="post" class="form-grid">
+        <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
+        <label>
+            Senha atual
+            <input type="password" name="senha_atual" autocomplete="current-password" required>
+        </label>
+        <label>
+            Nova senha
+            <input type="password" name="nova_senha" autocomplete="new-password" minlength="12" maxlength="128" required>
+        </label>
+        <label>
+            Confirmar nova senha
+            <input type="password" name="confirmar_senha" autocomplete="new-password" minlength="12" maxlength="128" required>
+        </label>
+        <div class="form-actions">
+            <button type="submit">Salvar nova senha</button>
+        </div>
+    </form>
+</section>
+{% endblock %}

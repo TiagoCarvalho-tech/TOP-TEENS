@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+
+{% block content %}
+<section class="page-head">
+    <div>
+        <p class="section-tag">Regras de negócio</p>
+        <h2>Tarefas e pontuação</h2>
+    </div>
+    {% if usuario_master() %}
+    <a class="button-link" href="{{ url_for('nova_atividade') }}">Nova tarefa</a>
+    {% endif %}
+</section>
+
+<section class="card">
+    <table>
+        <thead>
+            <tr>
+                <th>Tarefa</th>
+                <th>Pontos</th>
+                <th>Descrição</th>
+                <th>Status</th>
+                {% if usuario_master() %}<th>Ações</th>{% endif %}
+            </tr>
+        </thead>
+        <tbody>
+            {% for atividade in atividades %}
+            <tr>
+                <td>{{ atividade.nome }}</td>
+                <td>{{ atividade.pontos }}</td>
+                <td>{{ atividade.descricao or "-" }}</td>
+                <td>{{ "Ativa" if atividade.ativo else "Inativa" }}</td>
+                {% if usuario_master() %}
+                <td class="actions">
+                    <a href="{{ url_for('editar_atividade', atividade_id=atividade.id) }}">Editar</a>
+                    <form method="post" action="{{ url_for('excluir_atividade', atividade_id=atividade.id) }}">
+                        <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
+                        <button type="submit" class="button-link danger">Excluir</button>
+                    </form>
+                </td>
+                {% endif %}
+            </tr>
+            {% else %}
+            <tr><td colspan="{{ 5 if usuario_master() else 4 }}">Nenhuma tarefa cadastrada.</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</section>
+{% endblock %}

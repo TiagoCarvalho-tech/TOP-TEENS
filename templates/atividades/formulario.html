@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+
+{% block content %}
+<section class="page-head">
+    <div>
+        <p class="section-tag">Pontuação</p>
+        <h2>{% if atividade %}Editar tarefa{% else %}Nova tarefa{% endif %}</h2>
+    </div>
+</section>
+
+<section class="card">
+    <form method="post" class="form-grid two-cols">
+        <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
+        <label>
+            Nome da tarefa
+            <input type="text" name="nome" maxlength="80" value="{{ atividade.nome if atividade else '' }}" required>
+        </label>
+        <label>
+            Pontos
+            <input type="number" name="pontos" min="0" max="1000" value="{{ atividade.pontos if atividade else '' }}" required>
+        </label>
+        <label class="full-span">
+            Descrição
+            <textarea name="descricao" rows="4" maxlength="200">{{ atividade.descricao if atividade else '' }}</textarea>
+        </label>
+        <label>
+            Status
+            <select name="ativo">
+                {% set ativo = atividade.ativo if atividade else 1 %}
+                <option value="1" {% if ativo == 1 %}selected{% endif %}>Ativa</option>
+                <option value="0" {% if ativo == 0 %}selected{% endif %}>Inativa</option>
+            </select>
+        </label>
+        <div class="form-actions">
+            <button type="submit">{% if atividade %}Salvar tarefa{% else %}Cadastrar tarefa{% endif %}</button>
+        </div>
+    </form>
+</section>
+{% endblock %}

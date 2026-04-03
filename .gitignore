@@ -1,0 +1,5 @@
+__pycache__/
+*.pyc
+.venv/
+topteens.db
+.secret_key

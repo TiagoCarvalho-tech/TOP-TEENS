@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+
+{% block content %}
+<section class="page-head">
+    <div>
+        <p class="section-tag">Perfil</p>
+        <h2>{{ adolescente.nome }}</h2>
+        <p class="muted">Matrícula {{ adolescente.matricula }} • Líder de GA: {{ adolescente.lider_ga }}</p>
+    </div>
+    <a class="button-link" href="{{ url_for('editar_adolescente', adolescente_id=adolescente.id) }}">Editar cadastro</a>
+</section>
+
+<section class="stats">
+    <article class="card stat-card">
+        <span>Pontuação total</span>
+        <strong>{{ pontuacao.total_pontos if pontuacao else 0 }}</strong>
+    </article>
+    <article class="card stat-card">
+        <span>Pontos em cumprimentos</span>
+        <strong>{{ pontuacao.pontos_tarefas if pontuacao else 0 }}</strong>
+    </article>
+    <article class="card stat-card">
+        <span>Total de registros</span>
+        <strong>{{ cumprimentos|length }}</strong>
+    </article>
+</section>
+
+<section class="card">
+    <div class="card-head">
+        <h3>Cumprimentos registrados</h3>
+    </div>
+    <table>
+        <thead>
+            <tr>
+                <th>Data</th>
+                <th>Atividade</th>
+                <th>Status</th>
+                <th>Pontos</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for item in cumprimentos %}
+            <tr>
+                <td>{{ item.data_cumprimento }}</td>
+                <td>{{ item.atividade_nome }}</td>
+                <td>{{ "Sim" if item.cumpriu else "Não" }}</td>
+                <td>{{ item.atividade_pontos if item.cumpriu else 0 }}</td>
+            </tr>
+            {% else %}
+            <tr><td colspan="4">Nenhum cumprimento registrado.</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</section>
+{% endblock %}

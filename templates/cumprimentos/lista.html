@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+
+{% block content %}
+<section class="page-head">
+    <div>
+        <p class="section-tag">Execução</p>
+        <h2>Cumprimentos de tarefas</h2>
+    </div>
+    <a class="button-link" href="{{ url_for('novo_cumprimento') }}">Novo registro</a>
+</section>
+
+<section class="card">
+    <table>
+        <thead>
+            <tr>
+                <th>Adolescente</th>
+                <th>Tarefa</th>
+                <th>Data</th>
+                <th>Cumpriu?</th>
+                <th>Pontos</th>
+                <th>Ações</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for item in cumprimentos %}
+            <tr>
+                <td>{{ item.adolescente_nome }}</td>
+                <td>{{ item.atividade_nome }}</td>
+                <td>{{ item.data_cumprimento }}</td>
+                <td>{{ "Sim" if item.cumpriu else "Não" }}</td>
+                <td>{{ item.atividade_pontos if item.cumpriu else 0 }}</td>
+                <td class="actions">
+                    <a href="{{ url_for('editar_cumprimento', cumprimento_id=item.id) }}">Editar</a>
+                    <form method="post" action="{{ url_for('excluir_cumprimento', cumprimento_id=item.id) }}">
+                        <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
+                        <button type="submit" class="button-link danger">Excluir</button>
+                    </form>
+                </td>
+            </tr>
+            {% else %}
+            <tr><td colspan="6">Nenhum cumprimento registrado.</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</section>
+{% endblock %}

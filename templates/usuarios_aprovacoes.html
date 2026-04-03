@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+
+{% block content %}
+<section class="page-head">
+    <div>
+        <p class="section-tag">Master</p>
+        <h2>Aprovação de contas de líderes</h2>
+    </div>
+</section>
+
+<section class="card">
+    <table>
+        <thead>
+            <tr>
+                <th>Nome</th>
+                <th>Contato</th>
+                <th>Aniversário</th>
+                <th>Usuário</th>
+                <th>Líder de GA</th>
+                <th>Solicitado em</th>
+                <th>Ações</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for usuario in usuarios %}
+            <tr>
+                <td>{{ usuario.nome }}</td>
+                <td>{{ usuario.contato or "-" }}</td>
+                <td>{{ usuario.aniversario or "-" }}</td>
+                <td>{{ usuario.username }}</td>
+                <td>{{ usuario.lider_ga }}</td>
+                <td>{{ usuario.criado_em }}</td>
+                <td class="actions">
+                    <form method="post" action="{{ url_for('aprovar_usuario', usuario_id=usuario.id) }}">
+                        <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
+                        <button type="submit">Aprovar</button>
+                    </form>
+                    <form method="post" action="{{ url_for('rejeitar_usuario', usuario_id=usuario.id) }}">
+                        <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
+                        <button type="submit" class="button-link danger">Recusar</button>
+                    </form>
+                </td>
+            </tr>
+            {% else %}
+            <tr><td colspan="7">Nenhuma solicitação pendente.</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</section>
+{% endblock %}

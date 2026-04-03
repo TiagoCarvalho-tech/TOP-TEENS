@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Nova Teens</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body class="{% if not session.get('usuario_id') %}guest-body{% endif %}">
+    {% if session.get("usuario_id") %}
+    <div class="layout">
+        <aside class="sidebar">
+            <div class="sidebar-top">
+                <img class="brand-logo" src="{{ url_for('static', filename='logo-nova-teens.png') }}" alt="Logo Nova Teens">
+                <p class="brand-eyebrow">Desafio Oficial</p>
+                <h1>Nova Teens</h1>
+                <p class="brand-copy">Pontuação, presença e acompanhamento dos adolescentes em um só lugar.</p>
+
+                <div class="user-chip">
+                    <strong>{{ session.get("usuario_nome") }}</strong>
+                    <span>{{ "Master" if session.get("usuario_role") == "MASTER" else session.get("usuario_lider_ga") }}</span>
+                </div>
+            </div>
+
+            <nav class="nav">
+                <a href="{{ url_for('dashboard') }}">Dashboard</a>
+                <a href="{{ url_for('listar_adolescentes') }}">Adolescentes</a>
+                <a href="{{ url_for('listar_atividades') }}">Atividades</a>
+                <a href="{{ url_for('listar_cumprimentos') }}">Cumprimentos</a>
+                <a href="{{ url_for('ranking') }}">Rankings</a>
+                {% if usuario_master() %}
+                <a href="{{ url_for('usuarios_aprovacoes') }}">Aprovações</a>
+                {% endif %}
+                <a href="{{ url_for('alterar_senha') }}">Segurança</a>
+                <a href="{{ url_for('logout') }}">Sair</a>
+            </nav>
+        </aside>
+
+        <main class="content">
+    {% else %}
+        <main class="guest-main">
+    {% endif %}
+
+            {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}
+                    <div class="flash-stack {% if not session.get('usuario_id') %}guest-flashes{% endif %}">
+                    {% for category, message in messages %}
+                        <div class="flash flash-{{ category }}">{{ message }}</div>
+                    {% endfor %}
+                    </div>
+                {% endif %}
+            {% endwith %}
+
+            {% block content %}{% endblock %}
+        </main>
+
+    {% if session.get("usuario_id") %}
+    </div>
+    {% endif %}
+</body>
+</html>

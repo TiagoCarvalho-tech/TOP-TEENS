@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+
+{% block content %}
+<section class="page-head">
+    <div>
+        <p class="section-tag">Cadastro</p>
+        <h2>{% if adolescente %}Editar adolescente{% else %}Novo adolescente{% endif %}</h2>
+    </div>
+</section>
+
+<section class="card">
+    <form method="post" class="form-grid two-cols">
+        <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
+        <label>
+            Nome
+            <input type="text" name="nome" maxlength="80" pattern="[A-Za-zÀ-ÿ' -]{3,80}" value="{{ adolescente.nome if adolescente else '' }}" required>
+        </label>
+        <label>
+            Data de nascimento
+            <input type="date" name="nascimento" max="{{ today }}" value="{{ adolescente.nascimento if adolescente else '' }}" required>
+        </label>
+        <label>
+            Contato
+            <input type="tel" name="contato" maxlength="15" placeholder="(92) 99999-9999" value="{{ adolescente.contato if adolescente else '' }}">
+        </label>
+        <label>
+            Gênero
+            <select name="sexo" required>
+                {% set sexo = adolescente.sexo if adolescente else '' %}
+                <option value="">Selecione</option>
+                <option value="M" {% if sexo == 'M' %}selected{% endif %}>Masculino</option>
+                <option value="F" {% if sexo == 'F' %}selected{% endif %}>Feminino</option>
+            </select>
+        </label>
+        <label>
+            Pai
+            <input type="text" name="pai" maxlength="80" pattern="[A-Za-zÀ-ÿ' -]{0,80}" value="{{ adolescente.pai if adolescente else '' }}">
+        </label>
+        <label>
+            Mãe
+            <input type="text" name="mae" maxlength="80" pattern="[A-Za-zÀ-ÿ' -]{0,80}" value="{{ adolescente.mae if adolescente else '' }}">
+        </label>
+        <label class="full-span">
+            Líder de GA
+            {% if usuario_master() %}
+            <input type="text" name="lider_ga" maxlength="80" pattern="[A-Za-zÀ-ÿ' -]{3,80}" value="{{ adolescente.lider_ga if adolescente else '' }}" required>
+            {% else %}
+            <input type="text" name="lider_ga" value="{{ session.get('usuario_lider_ga') }}" readonly required>
+            {% endif %}
+        </label>
+        <div class="form-actions">
+            <button type="submit">{% if adolescente %}Salvar alterações{% else %}Cadastrar adolescente{% endif %}</button>
+        </div>
+    </form>
+</section>
+{% endblock %}

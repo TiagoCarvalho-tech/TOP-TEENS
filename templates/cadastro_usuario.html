@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+
+{% block content %}
+<section class="auth-shell single">
+    <article class="auth-card wide">
+        <div class="auth-head">
+            <div>
+                <p class="section-tag">Conta de líder</p>
+                <h2>Solicitar acesso</h2>
+                <p class="muted">O usuário master precisa aprovar seu cadastro antes do primeiro login.</p>
+            </div>
+            <a class="button-link alt" href="{{ url_for('login') }}">Voltar ao login</a>
+        </div>
+
+        <form method="post" class="form-grid two-cols">
+            <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
+            <label>
+                Nome completo
+                <input type="text" name="nome" maxlength="80" pattern="[A-Za-zÀ-ÿ' -]{3,80}" required>
+            </label>
+            <label>
+                Contato
+                <input type="tel" name="contato" maxlength="15" placeholder="(92) 99999-9999" required>
+            </label>
+            <label>
+                Aniversário
+                <input type="date" name="aniversario" max="{{ today }}" required>
+            </label>
+            <label>
+                Nome de usuário
+                <input type="text" name="username" maxlength="30" pattern="[a-z0-9._-]{4,30}" placeholder="ex.: maria.silva" required>
+                <small class="field-help">Use de 4 a 30 caracteres com letras minúsculas, números, ponto, hífen ou sublinhado. Exemplo: <strong>maria.silva</strong></small>
+            </label>
+            <label>
+                Líder de GA
+                <input type="text" name="lider_ga" maxlength="80" pattern="[A-Za-zÀ-ÿ' -]{3,80}" required>
+            </label>
+            <label>
+                Senha
+                <input type="password" name="senha" minlength="12" maxlength="128" required>
+            </label>
+            <label>
+                Confirmar senha
+                <input type="password" name="confirmar_senha" minlength="12" maxlength="128" required>
+            </label>
+            <div class="form-actions">
+                <button type="submit">Enviar para aprovação</button>
+            </div>
+        </form>
+    </article>
+</section>
+{% endblock %}

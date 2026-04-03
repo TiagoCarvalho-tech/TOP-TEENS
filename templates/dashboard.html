@@ -1,0 +1,132 @@
+{% extends "base.html" %}
+
+{% block content %}
+<section class="hero">
+    <div>
+        <p class="section-tag">Painel geral</p>
+        <h2>Controle completo do Nova Teens</h2>
+        <p class="muted">Acompanhe pontuação, aniversários e a performance por gênero e por líder de GA.</p>
+    </div>
+    <div class="hero-actions">
+        <a class="button-link" href="{{ url_for('novo_adolescente') }}">Novo adolescente</a>
+        <a class="button-link alt" href="{{ url_for('novo_cumprimento') }}">Registrar atividade</a>
+    </div>
+</section>
+
+<section class="stats">
+    <article class="card stat-card">
+        <span>Total de adolescentes</span>
+        <strong>{{ resumo.total_adolescentes }}</strong>
+    </article>
+    <article class="card stat-card">
+        <span>Pontos acumulados</span>
+        <strong>{{ resumo.total_pontos }}</strong>
+    </article>
+    <article class="card stat-card">
+        <span>Líderes de GA</span>
+        <strong>{{ resumo.lideres_ga|length }}</strong>
+    </article>
+</section>
+
+<section class="grid-two">
+    <article class="card">
+        <div class="card-head">
+            <h3>Top 5 geral</h3>
+            <a href="{{ url_for('ranking') }}">Ver ranking completo</a>
+        </div>
+        <table>
+            <thead>
+                <tr>
+                    <th>Adolescente</th>
+                    <th>GA</th>
+                    <th>Pontos</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in resumo.top_5 %}
+                <tr>
+                    <td>{{ item.nome }}</td>
+                    <td>{{ item.lider_ga }}</td>
+                    <td>{{ item.total_pontos }}</td>
+                </tr>
+                {% else %}
+                <tr><td colspan="3">Nenhum adolescente cadastrado.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </article>
+
+    <article class="card">
+        <div class="card-head">
+            <h3>Aniversários próximos</h3>
+            <span class="muted">Próximos 30 dias</span>
+        </div>
+        <ul class="list-clean">
+            {% for item in aniversariantes %}
+            <li>
+                <strong>{{ item.nome }}</strong>
+                <span>{{ item.data_aniversario.strftime("%d/%m") }} • faltam {{ item.faltam }} dia(s)</span>
+            </li>
+            {% else %}
+            <li>Nenhum aniversário próximo.</li>
+            {% endfor %}
+        </ul>
+    </article>
+</section>
+
+<section class="grid-two">
+    <article class="card">
+        <div class="card-head">
+            <h3>Ranking masculino</h3>
+        </div>
+        <ol class="ranking-list">
+            {% for item in ranking_genero["M"][:5] %}
+            <li><span>{{ item.nome }}</span><strong>{{ item.total_pontos }}</strong></li>
+            {% else %}
+            <li>Nenhum registro.</li>
+            {% endfor %}
+        </ol>
+    </article>
+
+    <article class="card">
+        <div class="card-head">
+            <h3>Ranking feminino</h3>
+        </div>
+        <ol class="ranking-list">
+            {% for item in ranking_genero["F"][:5] %}
+            <li><span>{{ item.nome }}</span><strong>{{ item.total_pontos }}</strong></li>
+            {% else %}
+            <li>Nenhum registro.</li>
+            {% endfor %}
+        </ol>
+    </article>
+</section>
+
+<section class="card">
+    <div class="card-head">
+        <h3>Ranking por líder de GA</h3>
+    </div>
+    <table>
+        <thead>
+            <tr>
+                <th>#</th>
+                <th>Líder de GA</th>
+                <th>Adolescentes</th>
+                <th>Pontos</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for item in ranking_lider_ga[:5] %}
+            <tr>
+                <td>{{ loop.index }}</td>
+                <td>{{ item.lider_ga }}</td>
+                <td>{{ item.total_adolescentes }}</td>
+                <td><strong>{{ item.total_pontos }}</strong></td>
+            </tr>
+            {% else %}
+            <tr><td colspan="4">Nenhum líder de GA disponível.</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</section>
+{% endblock %}

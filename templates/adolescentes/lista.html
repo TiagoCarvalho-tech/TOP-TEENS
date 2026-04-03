@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+
+{% block content %}
+<section class="page-head">
+    <div>
+        <p class="section-tag">Cadastro</p>
+        <h2>Adolescentes</h2>
+    </div>
+    <a class="button-link" href="{{ url_for('novo_adolescente') }}">Novo cadastro</a>
+</section>
+
+<section class="card">
+    <form method="get" class="filters">
+        <input type="text" name="busca" maxlength="80" placeholder="Pesquisar por nome ou matrícula" value="{{ filtros.busca }}">
+        {% if usuario_master() %}
+        <select name="lider_ga">
+            <option value="">Todos os líderes de GA</option>
+            {% for lider in lideres %}
+            <option value="{{ lider }}" {% if filtros.lider_ga == lider %}selected{% endif %}>{{ lider }}</option>
+            {% endfor %}
+        </select>
+        {% endif %}
+        <select name="sexo">
+            <option value="">Todos os gêneros</option>
+            <option value="M" {% if filtros.sexo == "M" %}selected{% endif %}>Masculino</option>
+            <option value="F" {% if filtros.sexo == "F" %}selected{% endif %}>Feminino</option>
+        </select>
+        <button type="submit">Filtrar</button>
+    </form>
+</section>
+
+<section class="card">
+    <table>
+        <thead>
+            <tr>
+                <th>Matrícula</th>
+                <th>Nome</th>
+                <th>Gênero</th>
+                <th>Contato</th>
+                <th>Líder de GA</th>
+                <th>Ações</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for adolescente in adolescentes %}
+            <tr>
+                <td>{{ adolescente.matricula }}</td>
+                <td><a href="{{ url_for('detalhe_adolescente', adolescente_id=adolescente.id) }}">{{ adolescente.nome }}</a></td>
+                <td>{{ "Masculino" if adolescente.sexo == "M" else "Feminino" }}</td>
+                <td>{{ adolescente.contato or "-" }}</td>
+                <td>{{ adolescente.lider_ga }}</td>
+                <td class="actions">
+                    <a href="{{ url_for('editar_adolescente', adolescente_id=adolescente.id) }}">Editar</a>
+                    <form method="post" action="{{ url_for('excluir_adolescente', adolescente_id=adolescente.id) }}">
+                        <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
+                        <button type="submit" class="button-link danger">Excluir</button>
+                    </form>
+                </td>
+            </tr>
+            {% else %}
+            <tr><td colspan="6">Nenhum adolescente encontrado.</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</section>
+{% endblock %}
