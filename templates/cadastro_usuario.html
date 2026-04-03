@@ -24,7 +24,7 @@
             </label>
             <label>
                 Aniversário
-                <input type="date" name="aniversario" max="{{ today }}" required>
+                <input type="date" name="aniversario" min="1950-01-01" max="{{ today }}" required>
             </label>
             <label>
                 Nome de usuário
@@ -38,6 +38,7 @@
             <label>
                 Senha
                 <input type="password" name="senha" minlength="12" maxlength="128" required>
+                <small class="field-help">A senha precisa ter no mínimo 12 caracteres, com pelo menos 1 letra maiúscula, 1 letra minúscula, 1 número e 1 caractere especial.</small>
             </label>
             <label>
                 Confirmar senha

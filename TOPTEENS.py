@@ -226,11 +226,10 @@ def validar_nascimento(valor):
         return "Informe uma data de nascimento válida."
 
     hoje = date.today()
-    idade = hoje.year - nascimento.year - ((hoje.month, hoje.day) < (nascimento.month, nascimento.day))
     if nascimento > hoje:
         return "A data de nascimento não pode estar no futuro."
-    if idade < 8 or idade > 25:
-        return "A data de nascimento está fora da faixa esperada para o cadastro."
+    if nascimento.year < 1950:
+        return "A data de nascimento deve ser a partir de 1950."
     return None
 
 
