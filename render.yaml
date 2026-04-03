@@ -1,0 +1,25 @@
+services:
+  - type: web
+    name: nova-teens
+    runtime: python
+    plan: free
+    region: oregon
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn TOPTEENS:app
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: nova-teens-db
+          property: connectionString
+      - key: TOPTEENS_SECRET_KEY
+        generateValue: true
+      - key: TOPTEENS_HTTPS_ONLY
+        value: "1"
+      - key: PYTHON_VERSION
+        value: "3.13.5"
+
+databases:
+  - name: nova-teens-db
+    plan: free
+    region: oregon
+    postgresMajorVersion: "17"

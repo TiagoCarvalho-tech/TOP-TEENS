@@ -7,7 +7,7 @@ from database import get_connection
 def gerar_matricula(connection):
     ano_atual = datetime.now().year
     cursor = connection.execute(
-        "SELECT COUNT(*) AS total FROM adolescentes WHERE matricula LIKE ?",
+        "SELECT COUNT(*) AS total FROM adolescentes WHERE matricula LIKE %s",
         (f"{ano_atual}%",),
     )
     sequencia = cursor.fetchone()["total"] + 1
@@ -35,16 +35,16 @@ def listar_adolescentes(busca="", lider_ga="", sexo=""):
     parametros = []
 
     if busca:
-        filtros.append("(nome LIKE ? OR matricula LIKE ?)")
+        filtros.append("(nome ILIKE %s OR matricula ILIKE %s)")
         termo = f"%{busca.strip()}%"
         parametros.extend([termo, termo])
 
     if lider_ga:
-        filtros.append("lider_ga = ?")
+        filtros.append("lider_ga = %s")
         parametros.append(lider_ga)
 
     if sexo:
-        filtros.append("sexo = ?")
+        filtros.append("sexo = %s")
         parametros.append(sexo)
 
     where = ""
@@ -78,7 +78,7 @@ def listar_lideres_ga():
 def obter_adolescente(adolescente_id):
     with get_connection() as connection:
         return connection.execute(
-            "SELECT * FROM adolescentes WHERE id = ?",
+            "SELECT * FROM adolescentes WHERE id = %s",
             (adolescente_id,),
         ).fetchone()
 
@@ -90,7 +90,7 @@ def cadastrar_adolescente(dados):
             """
             INSERT INTO adolescentes (
                 matricula, nome, nascimento, contato, sexo, pai, mae, lider_ga
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
             """,
             (
                 matricula,
@@ -111,8 +111,8 @@ def atualizar_adolescente(adolescente_id, dados):
         connection.execute(
             """
             UPDATE adolescentes
-            SET nome = ?, nascimento = ?, contato = ?, sexo = ?, pai = ?, mae = ?, lider_ga = ?
-            WHERE id = ?
+            SET nome = %s, nascimento = %s, contato = %s, sexo = %s, pai = %s, mae = %s, lider_ga = %s
+            WHERE id = %s
             """,
             (
                 normalizar_nome(dados["nome"]),
@@ -129,7 +129,7 @@ def atualizar_adolescente(adolescente_id, dados):
 
 def excluir_adolescente(adolescente_id):
     with get_connection() as connection:
-        connection.execute("DELETE FROM adolescentes WHERE id = ?", (adolescente_id,))
+        connection.execute("DELETE FROM adolescentes WHERE id = %s", (adolescente_id,))
 
 
 def aniversariantes_proximos(dias=30):

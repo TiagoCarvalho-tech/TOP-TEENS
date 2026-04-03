@@ -97,14 +97,14 @@ def obter_lider_ga_usuario():
 def criar_usuario_padrao():
     with get_connection() as connection:
         usuario = connection.execute(
-            "SELECT id FROM usuarios WHERE username = ?",
+            "SELECT id FROM usuarios WHERE username = %s",
             ("tio",),
         ).fetchone()
         if usuario is None:
             connection.execute(
                 """
                 INSERT INTO usuarios (nome, username, senha_hash, role, aprovado, lider_ga)
-                VALUES (?, ?, ?, 'MASTER', 1, ?)
+                VALUES (%s, %s, %s, 'MASTER', 1, %s)
                 """,
                 ("Tio Responsável", "tio", generate_password_hash("topteens123"), "Administração"),
             )
@@ -137,15 +137,15 @@ def popular_atividades_iniciais():
     with get_connection() as connection:
         for nome, pontos, descricao in atividades_padrao:
             atividade = connection.execute(
-                "SELECT id FROM atividades WHERE lower(nome) = lower(?)",
+                "SELECT id FROM atividades WHERE lower(nome) = lower(%s)",
                 (nome,),
             ).fetchone()
             if atividade:
                 connection.execute(
                     """
                     UPDATE atividades
-                    SET pontos = ?, descricao = ?, ativo = 1
-                    WHERE id = ?
+                    SET pontos = %s, descricao = %s, ativo = 1
+                    WHERE id = %s
                     """,
                     (pontos, descricao, atividade["id"]),
                 )
@@ -153,7 +153,7 @@ def popular_atividades_iniciais():
                 connection.execute(
                     """
                     INSERT INTO atividades (nome, pontos, descricao, ativo)
-                    VALUES (?, ?, ?, 1)
+                    VALUES (%s, %s, %s, 1)
                     """,
                     (nome, pontos, descricao),
                 )
@@ -163,7 +163,7 @@ def popular_atividades_iniciais():
                 """
                 UPDATE atividades
                 SET ativo = 0
-                WHERE nome = ?
+                WHERE nome = %s
                 """,
                 (nome_legado,),
             )
@@ -445,7 +445,7 @@ def cadastro_usuario():
 
             with get_connection() as connection:
                 existente = connection.execute(
-                    "SELECT id FROM usuarios WHERE username = ?",
+                    "SELECT id FROM usuarios WHERE username = %s",
                     (username,),
                 ).fetchone()
                 if existente:
@@ -456,7 +456,7 @@ def cadastro_usuario():
                         INSERT INTO usuarios (
                             nome, contato, aniversario, username, senha_hash, role, aprovado, lider_ga
                         )
-                        VALUES (?, ?, ?, ?, ?, 'LIDER', 0, ?)
+                        VALUES (%s, %s, %s, %s, %s, 'LIDER', 0, %s)
                         """,
                         (
                             nome,
@@ -481,7 +481,7 @@ def login():
 
         with get_connection() as connection:
             usuario = connection.execute(
-                "SELECT * FROM usuarios WHERE username = ?",
+                "SELECT * FROM usuarios WHERE username = %s",
                 (username,),
             ).fetchone()
 
@@ -501,7 +501,7 @@ def login():
                     """
                     UPDATE usuarios
                     SET tentativas_falhas = 0, bloqueado_ate = NULL
-                    WHERE id = ?
+                    WHERE id = %s
                     """,
                     (usuario["id"],),
                 )
@@ -520,8 +520,8 @@ def login():
                 connection.execute(
                     """
                     UPDATE usuarios
-                    SET tentativas_falhas = ?, bloqueado_ate = ?
-                    WHERE id = ?
+                    SET tentativas_falhas = %s, bloqueado_ate = %s
+                    WHERE id = %s
                     """,
                     (tentativas, bloqueado_ate, usuario["id"]),
                 )
@@ -552,7 +552,7 @@ def aprovar_usuario(usuario_id):
             """
             UPDATE usuarios
             SET aprovado = 1
-            WHERE id = ? AND role = 'LIDER'
+            WHERE id = %s AND role = 'LIDER'
             """,
             (usuario_id,),
         )
@@ -565,7 +565,7 @@ def aprovar_usuario(usuario_id):
 def rejeitar_usuario(usuario_id):
     with get_connection() as connection:
         connection.execute(
-            "DELETE FROM usuarios WHERE id = ? AND role = 'LIDER' AND aprovado = 0",
+            "DELETE FROM usuarios WHERE id = %s AND role = 'LIDER' AND aprovado = 0",
             (usuario_id,),
         )
     flash("Solicitação removida com sucesso.", "info")
@@ -582,7 +582,7 @@ def alterar_senha():
         else:
             with get_connection() as connection:
                 usuario = connection.execute(
-                    "SELECT * FROM usuarios WHERE id = ?",
+                    "SELECT * FROM usuarios WHERE id = %s",
                     (session["usuario_id"],),
                 ).fetchone()
 
@@ -592,8 +592,8 @@ def alterar_senha():
                     connection.execute(
                         """
                         UPDATE usuarios
-                        SET senha_hash = ?
-                        WHERE id = ?
+                        SET senha_hash = %s
+                        WHERE id = %s
                         """,
                         (generate_password_hash(request.form["nova_senha"]), usuario["id"]),
                     )

@@ -27,7 +27,8 @@ Aplicação web para controle do desafio `Nova Teens`, com foco em cadastro de a
 
 - Python 3
 - Flask
-- SQLite
+- PostgreSQL
+- Psycopg 3
 - HTML + CSS
 
 ## Estrutura principal
@@ -47,6 +48,7 @@ cd "/Users/tiagocarvalho/Library/CloudStorage/OneDrive-Pessoal/TOPTEENS"
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
+export DATABASE_URL="postgresql://USUARIO:SENHA@HOST:5432/NOME_DO_BANCO"
 python TOPTEENS.py
 ```
 
@@ -93,10 +95,10 @@ O projeto inclui:
 
 ## Publicação
 
-Para disponibilizar online, você pode usar:
+Melhor opção para este projeto:
 
-- Railway
-- Render
+- Render para a aplicação
+- Render Postgres para o banco
 
 Comando de produção:
 
@@ -107,13 +109,39 @@ gunicorn TOPTEENS:app
 Variáveis recomendadas:
 
 ```bash
+DATABASE_URL=postgresql://USUARIO:SENHA@HOST:5432/NOME_DO_BANCO
 TOPTEENS_SECRET_KEY=sua_chave_forte_aqui
 TOPTEENS_HTTPS_ONLY=1
 ```
 
-Observação:
+### Deploy no Render
 
-Como o projeto usa `SQLite`, é importante usar armazenamento persistente na hospedagem. Para uso mais robusto em produção, o ideal é migrar depois para `PostgreSQL`.
+O projeto já possui o arquivo [render.yaml](/Users/tiagocarvalho/Library/CloudStorage/OneDrive-Pessoal/TOPTEENS/render.yaml), que prepara:
+
+- um `Web Service`
+- um banco `PostgreSQL`
+- ligação automática do `DATABASE_URL`
+- geração automática da chave secreta
+
+Passo a passo:
+
+1. Envie as alterações mais recentes para o GitHub.
+2. Entre em https://render.com
+3. Clique em `New +`
+4. Escolha `Blueprint`
+5. Conecte o repositório `TOP-TEENS`
+6. O Render vai ler o `render.yaml`
+7. Confirme a criação do serviço web e do banco
+8. Aguarde o primeiro deploy
+9. Acesse a URL pública gerada pelo Render
+
+Observações importantes:
+
+O projeto agora usa `PostgreSQL` como banco principal, o que é mais adequado para uso online com múltiplos acessos.
+
+- Se o plano `free` não aparecer na sua conta, troque no painel para o plano disponível mais barato.
+- Na primeira execução, a aplicação cria automaticamente as tabelas necessárias.
+- O usuário master padrão continua sendo `tio`, com a senha inicial `topteens123`, então troque essa senha assim que entrar.
 
 ## Arquivos que não devem subir para o GitHub
 
@@ -121,7 +149,6 @@ Exemplos:
 
 - `.venv/`
 - `.secret_key`
-- `topteens.db`
 - `__pycache__/`
 - `*.pyc`
 
