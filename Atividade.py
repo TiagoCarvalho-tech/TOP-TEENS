@@ -101,11 +101,12 @@ def obter_cumprimento(cumprimento_id):
 
 def registrar_cumprimento(dados):
     with get_connection() as connection:
-        connection.execute(
+        return connection.execute(
             """
             INSERT INTO cumprimentos_tarefas (
                 adolescente_id, atividade_id, data_cumprimento, cumpriu, observacoes
             ) VALUES (%s, %s, %s, %s, %s)
+            RETURNING id, atividade_id
             """,
             (
                 int(dados["adolescente_id"]),
@@ -114,30 +115,30 @@ def registrar_cumprimento(dados):
                 int(dados["cumpriu"]),
                 dados.get("observacoes", "").strip(),
             ),
-        )
+        ).fetchone()
 
 
 def registrar_cumprimentos_em_lote(dados, atividade_ids):
-    registros = [
-        (
-            int(dados["adolescente_id"]),
-            int(atividade_id),
-            dados["data_cumprimento"],
-            int(dados["cumpriu"]),
-            dados.get("observacoes", "").strip(),
-        )
-        for atividade_id in atividade_ids
-    ]
-
     with get_connection() as connection:
-        connection.executemany(
-            """
-            INSERT INTO cumprimentos_tarefas (
-                adolescente_id, atividade_id, data_cumprimento, cumpriu, observacoes
-            ) VALUES (%s, %s, %s, %s, %s)
-            """,
-            registros,
-        )
+        registros = []
+        for atividade_id in atividade_ids:
+            registro = connection.execute(
+                """
+                INSERT INTO cumprimentos_tarefas (
+                    adolescente_id, atividade_id, data_cumprimento, cumpriu, observacoes
+                ) VALUES (%s, %s, %s, %s, %s)
+                RETURNING id, atividade_id
+                """,
+                (
+                    int(dados["adolescente_id"]),
+                    int(atividade_id),
+                    dados["data_cumprimento"],
+                    int(dados["cumpriu"]),
+                    dados.get("observacoes", "").strip(),
+                ),
+            ).fetchone()
+            registros.append(registro)
+    return registros
 
 
 def atualizar_cumprimento(cumprimento_id, dados):

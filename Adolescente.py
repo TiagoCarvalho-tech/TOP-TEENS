@@ -86,11 +86,12 @@ def obter_adolescente(adolescente_id):
 def cadastrar_adolescente(dados):
     with get_connection() as connection:
         matricula = gerar_matricula(connection)
-        connection.execute(
+        adolescente = connection.execute(
             """
             INSERT INTO adolescentes (
                 matricula, nome, nascimento, contato, sexo, pai, mae, lider_ga
             ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+            RETURNING id, matricula
             """,
             (
                 matricula,
@@ -102,8 +103,8 @@ def cadastrar_adolescente(dados):
                 normalizar_nome(dados.get("mae", "")),
                 normalizar_nome(dados["lider_ga"]),
             ),
-        )
-    return matricula
+        ).fetchone()
+    return adolescente
 
 
 def atualizar_adolescente(adolescente_id, dados):

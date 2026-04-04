@@ -97,7 +97,7 @@ def obter_lider_ga_usuario():
 def criar_usuario_padrao():
     with get_connection() as connection:
         usuario = connection.execute(
-            "SELECT id FROM usuarios WHERE username = %s",
+            "SELECT id, aprovado FROM usuarios WHERE username = %s",
             ("tio",),
         ).fetchone()
         if usuario is None:
@@ -112,7 +112,7 @@ def criar_usuario_padrao():
             connection.execute(
                 """
                 UPDATE usuarios
-                SET role = 'MASTER', aprovado = 1
+                SET aprovado = 1
                 WHERE username = 'tio'
                 """
             )
@@ -387,6 +387,53 @@ def listar_usuarios_pendentes():
         ).fetchall()
 
 
+def listar_usuarios_aprovados():
+    with get_connection() as connection:
+        return connection.execute(
+            """
+            SELECT *
+            FROM usuarios
+            WHERE aprovado = 1
+            ORDER BY
+                CASE WHEN role = 'MASTER' THEN 0 ELSE 1 END,
+                nome
+            """
+        ).fetchall()
+
+
+def contar_masters():
+    with get_connection() as connection:
+        row = connection.execute(
+            """
+            SELECT COUNT(*) AS total
+            FROM usuarios
+            WHERE aprovado = 1 AND role = 'MASTER'
+            """
+        ).fetchone()
+    return row["total"]
+
+
+def registrar_auditoria(tipo_evento, alvo_tipo, alvo_id=None, detalhes=""):
+    usuario_id = session.get("usuario_id")
+    if not usuario_id:
+        return
+
+    with get_connection() as connection:
+        connection.execute(
+            """
+            INSERT INTO auditoria_eventos (usuario_id, tipo_evento, alvo_tipo, alvo_id, detalhes)
+            VALUES (%s, %s, %s, %s, %s)
+            """,
+            (
+                usuario_id,
+                tipo_evento,
+                alvo_tipo,
+                alvo_id,
+                (detalhes or "").strip()[:500],
+            ),
+        )
+
+
 @app.context_processor
 def inject_today():
     return {
@@ -540,7 +587,12 @@ def logout():
 @app.route("/usuarios/aprovacoes")
 @master_obrigatorio
 def usuarios_aprovacoes():
-    return render_template("usuarios_aprovacoes.html", usuarios=listar_usuarios_pendentes())
+    return render_template(
+        "usuarios_aprovacoes.html",
+        usuarios_pendentes=listar_usuarios_pendentes(),
+        usuarios_aprovados=listar_usuarios_aprovados(),
+        total_masters=contar_masters(),
+    )
 
 
 @app.route("/usuarios/<int:usuario_id>/aprovar", methods=["POST"])
@@ -555,6 +607,7 @@ def aprovar_usuario(usuario_id):
             """,
             (usuario_id,),
         )
+    registrar_auditoria("aprovacao_usuario", "usuario", usuario_id, "Conta aprovada pelo master.")
     flash("Conta aprovada com sucesso.", "success")
     return redirect(url_for("usuarios_aprovacoes"))
 
@@ -567,7 +620,81 @@ def rejeitar_usuario(usuario_id):
             "DELETE FROM usuarios WHERE id = %s AND role = 'LIDER' AND aprovado = 0",
             (usuario_id,),
         )
+    registrar_auditoria("rejeicao_usuario", "usuario", usuario_id, "Solicitação rejeitada pelo master.")
     flash("Solicitação removida com sucesso.", "info")
+    return redirect(url_for("usuarios_aprovacoes"))
+
+
+@app.route("/usuarios/<int:usuario_id>/promover-master", methods=["POST"])
+@master_obrigatorio
+def promover_master(usuario_id):
+    with get_connection() as connection:
+        usuario = connection.execute(
+            "SELECT * FROM usuarios WHERE id = %s",
+            (usuario_id,),
+        ).fetchone()
+
+        if usuario is None or not usuario["aprovado"]:
+            flash("Usuário não encontrado ou ainda não aprovado.", "danger")
+        elif usuario["role"] == "MASTER":
+            flash("Esse usuário já é master.", "warning")
+        else:
+            connection.execute(
+                """
+                UPDATE usuarios
+                SET role = 'MASTER'
+                WHERE id = %s
+                """,
+                (usuario_id,),
+            )
+            registrar_auditoria(
+                "promocao_master",
+                "usuario",
+                usuario_id,
+                f"{usuario['nome']} agora é master.",
+            )
+            flash("Usuário promovido para master com sucesso.", "success")
+
+    return redirect(url_for("usuarios_aprovacoes"))
+
+
+@app.route("/usuarios/<int:usuario_id>/remover-master", methods=["POST"])
+@master_obrigatorio
+def remover_master(usuario_id):
+    with get_connection() as connection:
+        usuario = connection.execute(
+            "SELECT * FROM usuarios WHERE id = %s",
+            (usuario_id,),
+        ).fetchone()
+
+        if usuario is None or not usuario["aprovado"]:
+            flash("Usuário não encontrado ou ainda não aprovado.", "danger")
+        elif usuario["role"] != "MASTER":
+            flash("Esse usuário já está como líder.", "warning")
+        elif contar_masters() <= 1:
+            flash("É obrigatório manter pelo menos um usuário master ativo.", "danger")
+        else:
+            connection.execute(
+                """
+                UPDATE usuarios
+                SET role = 'LIDER'
+                WHERE id = %s
+                """,
+                (usuario_id,),
+            )
+            registrar_auditoria(
+                "rebaixamento_master",
+                "usuario",
+                usuario_id,
+                f"{usuario['nome']} voltou para líder.",
+            )
+
+            if session.get("usuario_id") == usuario_id:
+                session["usuario_role"] = "LIDER"
+                session["usuario_lider_ga"] = usuario["lider_ga"] or ""
+
+            flash("Usuário voltou para o perfil de líder.", "info")
+
     return redirect(url_for("usuarios_aprovacoes"))
 
 
@@ -609,12 +736,14 @@ def dashboard():
     aniversariantes = Adolescente.aniversariantes_proximos()
     ranking_genero = Pontuacao.ranking_por_sexo()
     ranking_lider_ga = Pontuacao.ranking_por_lider_ga()
+    lideres_mais_ativos = Pontuacao.ranking_lideres_mais_ativos()
     return render_template(
         "dashboard.html",
         resumo=resumo,
         aniversariantes=aniversariantes,
         ranking_genero=ranking_genero,
         ranking_lider_ga=ranking_lider_ga,
+        lideres_mais_ativos=lideres_mais_ativos,
     )
 
 
@@ -649,8 +778,14 @@ def novo_adolescente():
             dados = dict(request.form)
             if not usuario_master():
                 dados["lider_ga"] = obter_lider_ga_usuario()
-            matricula = Adolescente.cadastrar_adolescente(dados)
-            flash(f"Adolescente cadastrado com matrícula {matricula}.", "success")
+            adolescente = Adolescente.cadastrar_adolescente(dados)
+            registrar_auditoria(
+                "cadastro_adolescente",
+                "adolescente",
+                adolescente["id"],
+                f"Matrícula {adolescente['matricula']}.",
+            )
+            flash(f"Adolescente cadastrado com matrícula {adolescente['matricula']}.", "success")
             return redirect(url_for("listar_adolescentes"))
     return render_template("adolescentes/formulario.html", adolescente=None)
 
@@ -672,6 +807,12 @@ def editar_adolescente(adolescente_id):
             if not usuario_master():
                 dados["lider_ga"] = obter_lider_ga_usuario()
             Adolescente.atualizar_adolescente(adolescente_id, dados)
+            registrar_auditoria(
+                "edicao_adolescente",
+                "adolescente",
+                adolescente_id,
+                f"Cadastro de {adolescente['nome']} atualizado.",
+            )
             flash("Cadastro atualizado com sucesso.", "success")
             return redirect(url_for("listar_adolescentes"))
 
@@ -685,6 +826,12 @@ def excluir_adolescente(adolescente_id):
     if adolescente is None:
         flash("Adolescente não encontrado ou sem permissão de acesso.", "danger")
         return redirect(url_for("listar_adolescentes"))
+    registrar_auditoria(
+        "exclusao_adolescente",
+        "adolescente",
+        adolescente_id,
+        f"Exclusão de {adolescente['nome']}.",
+    )
     Adolescente.excluir_adolescente(adolescente_id)
     flash("Adolescente excluído com sucesso.", "info")
     return redirect(url_for("listar_adolescentes"))
@@ -785,7 +932,14 @@ def novo_cumprimento():
             flash("Você não tem permissão para lançar tarefa para este adolescente.", "danger")
         else:
             atividade_ids = [item for item in request.form.getlist("atividade_ids") if item.strip()]
-            Atividade.registrar_cumprimentos_em_lote(request.form, atividade_ids)
+            registros = Atividade.registrar_cumprimentos_em_lote(request.form, atividade_ids)
+            for registro in registros:
+                registrar_auditoria(
+                    "lancamento_cumprimento",
+                    "cumprimento",
+                    registro["id"],
+                    f"Lançamento para {adolescente['nome']}.",
+                )
             flash(f"{len(atividade_ids)} atividade(s) registrada(s) com sucesso.", "success")
             return redirect(url_for("listar_cumprimentos"))
 
@@ -814,6 +968,12 @@ def editar_cumprimento(cumprimento_id):
             flash("Você não tem permissão para lançar tarefa para este adolescente.", "danger")
         else:
             Atividade.atualizar_cumprimento(cumprimento_id, request.form)
+            registrar_auditoria(
+                "edicao_cumprimento",
+                "cumprimento",
+                cumprimento_id,
+                f"Cumprimento ajustado para {adolescente['nome']}.",
+            )
             flash("Cumprimento atualizado com sucesso.", "success")
             return redirect(url_for("listar_cumprimentos"))
 
@@ -832,6 +992,12 @@ def excluir_cumprimento(cumprimento_id):
     if cumprimento is None or obter_adolescente_com_permissao(cumprimento["adolescente_id"]) is None:
         flash("Registro de cumprimento não encontrado ou sem permissão de acesso.", "danger")
         return redirect(url_for("listar_cumprimentos"))
+    registrar_auditoria(
+        "exclusao_cumprimento",
+        "cumprimento",
+        cumprimento_id,
+        "Cumprimento excluído.",
+    )
     Atividade.excluir_cumprimento(cumprimento_id)
     flash("Cumprimento excluído com sucesso.", "info")
     return redirect(url_for("listar_cumprimentos"))
@@ -845,6 +1011,7 @@ def ranking():
         ranking=Pontuacao.ranking_geral(),
         ranking_genero=Pontuacao.ranking_por_sexo(),
         ranking_lider_ga=Pontuacao.ranking_por_lider_ga(),
+        lideres_mais_ativos=Pontuacao.ranking_lideres_mais_ativos(),
     )
 
 

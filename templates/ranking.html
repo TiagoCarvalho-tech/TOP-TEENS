@@ -95,4 +95,45 @@
         </tbody>
     </table>
 </section>
+
+<section class="card">
+    <div class="card-head">
+        <div>
+            <h3>Líderes mais ativos no sistema</h3>
+            <p class="muted-page">A contagem considera cadastros e edições de adolescentes, além de lançamentos e edições de cumprimentos.</p>
+        </div>
+    </div>
+    <table>
+        <thead>
+            <tr>
+                <th>#</th>
+                <th>Nome</th>
+                <th>Perfil</th>
+                <th>GA</th>
+                <th>Total de ações</th>
+                <th>Cadastros</th>
+                <th>Edições de adolescente</th>
+                <th>Lançamentos</th>
+                <th>Edições de cumprimento</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for item in lideres_mais_ativos %}
+            <tr>
+                <td>{{ loop.index }}</td>
+                <td>{{ item.nome }}</td>
+                <td>{{ "Master" if item.role == "MASTER" else "Líder" }}</td>
+                <td>{{ item.lider_ga }}</td>
+                <td><strong>{{ item.total_acoes }}</strong></td>
+                <td>{{ item.adolescentes_cadastrados }}</td>
+                <td>{{ item.adolescentes_editados }}</td>
+                <td>{{ item.cumprimentos_lancados }}</td>
+                <td>{{ item.cumprimentos_editados }}</td>
+            </tr>
+            {% else %}
+            <tr><td colspan="9">Ainda não há atividade registrada para os usuários.</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</section>
 {% endblock %}

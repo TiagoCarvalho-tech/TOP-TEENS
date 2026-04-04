@@ -64,8 +64,40 @@ def ranking_por_lider_ga():
         ).fetchall()
 
 
+def ranking_lideres_mais_ativos():
+    with get_connection() as connection:
+        return connection.execute(
+            """
+            SELECT
+                u.id,
+                u.nome,
+                u.username,
+                u.role,
+                COALESCE(u.lider_ga, '-') AS lider_ga,
+                COUNT(ae.id) AS total_acoes,
+                COUNT(*) FILTER (WHERE ae.tipo_evento = 'cadastro_adolescente') AS adolescentes_cadastrados,
+                COUNT(*) FILTER (WHERE ae.tipo_evento = 'edicao_adolescente') AS adolescentes_editados,
+                COUNT(*) FILTER (WHERE ae.tipo_evento = 'lancamento_cumprimento') AS cumprimentos_lancados,
+                COUNT(*) FILTER (WHERE ae.tipo_evento = 'edicao_cumprimento') AS cumprimentos_editados
+            FROM usuarios u
+            LEFT JOIN auditoria_eventos ae
+                ON ae.usuario_id = u.id
+                AND ae.tipo_evento IN (
+                    'cadastro_adolescente',
+                    'edicao_adolescente',
+                    'lancamento_cumprimento',
+                    'edicao_cumprimento'
+                )
+            WHERE u.aprovado = 1
+            GROUP BY u.id, u.nome, u.username, u.role, u.lider_ga
+            ORDER BY total_acoes DESC, u.nome
+            """
+        ).fetchall()
+
+
 def resumo_dashboard():
     ranking = ranking_geral()
+    ranking_atividade = ranking_lideres_mais_ativos()
 
     total_adolescentes = len(ranking)
     total_pontos = sum(item["total_pontos"] for item in ranking)
@@ -79,4 +111,5 @@ def resumo_dashboard():
         "lideres_ga": lideres_ga,
         "top_5": top_5,
         "ranking_lider_ga": ranking_por_lider_ga()[:5],
+        "lideres_mais_ativos": ranking_atividade[:5],
     }

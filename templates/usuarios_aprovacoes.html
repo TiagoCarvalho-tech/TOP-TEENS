@@ -4,11 +4,18 @@
 <section class="page-head">
     <div>
         <p class="section-tag">Master</p>
-        <h2>Aprovação de contas de líderes</h2>
+        <h2>Aprovação e gestão de usuários</h2>
+        <p class="muted-page">O master atual aprova novas contas e define quem também poderá atuar como master.</p>
     </div>
 </section>
 
 <section class="card">
+    <div class="card-head">
+        <div>
+            <h3>Solicitações pendentes</h3>
+            <p class="muted-page">Contas criadas por líderes aguardando aprovação.</p>
+        </div>
+    </div>
     <table>
         <thead>
             <tr>
@@ -22,7 +29,7 @@
             </tr>
         </thead>
         <tbody>
-            {% for usuario in usuarios %}
+            {% for usuario in usuarios_pendentes %}
             <tr>
                 <td>{{ usuario.nome }}</td>
                 <td>{{ usuario.contato or "-" }}</td>
@@ -43,6 +50,71 @@
             </tr>
             {% else %}
             <tr><td colspan="7">Nenhuma solicitação pendente.</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</section>
+
+<section class="card">
+    <div class="card-head">
+        <div>
+            <h3>Usuários aprovados</h3>
+            <p class="muted-page">
+                O master pode promover outros usuários a master. O sistema sempre mantém pelo menos um master ativo.
+                Masters ativos: <strong>{{ total_masters }}</strong>
+            </p>
+        </div>
+    </div>
+    <table>
+        <thead>
+            <tr>
+                <th>Nome</th>
+                <th>Usuário</th>
+                <th>GA</th>
+                <th>Perfil</th>
+                <th>Aniversário</th>
+                <th>Contato</th>
+                <th>Ações</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for usuario in usuarios_aprovados %}
+            <tr>
+                <td>
+                    {{ usuario.nome }}
+                    {% if usuario.id == session.get("usuario_id") %}
+                    <div class="table-note">Sessão atual</div>
+                    {% endif %}
+                </td>
+                <td>{{ usuario.username }}</td>
+                <td>{{ usuario.lider_ga or "-" }}</td>
+                <td>
+                    <span class="role-badge {{ 'role-master' if usuario.role == 'MASTER' else 'role-leader' }}">
+                        {{ "Master" if usuario.role == "MASTER" else "Líder" }}
+                    </span>
+                </td>
+                <td>{{ usuario.aniversario or "-" }}</td>
+                <td>{{ usuario.contato or "-" }}</td>
+                <td class="actions">
+                    {% if usuario.role == "MASTER" %}
+                        {% if total_masters > 1 %}
+                        <form method="post" action="{{ url_for('remover_master', usuario_id=usuario.id) }}">
+                            <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
+                            <button type="submit" class="button-link alt">Voltar para líder</button>
+                        </form>
+                        {% else %}
+                        <span class="table-note">Último master ativo</span>
+                        {% endif %}
+                    {% else %}
+                    <form method="post" action="{{ url_for('promover_master', usuario_id=usuario.id) }}">
+                        <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
+                        <button type="submit">Tornar master</button>
+                    </form>
+                    {% endif %}
+                </td>
+            </tr>
+            {% else %}
+            <tr><td colspan="7">Nenhum usuário aprovado encontrado.</td></tr>
             {% endfor %}
         </tbody>
     </table>

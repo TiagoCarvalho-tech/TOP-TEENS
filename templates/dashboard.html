@@ -129,4 +129,41 @@
         </tbody>
     </table>
 </section>
+
+<section class="card">
+    <div class="card-head">
+        <div>
+            <h3>Líderes mais ativos</h3>
+            <p class="muted-page">Medição por ações reais no sistema: cadastros e edições de adolescentes, além de lançamentos e edições de cumprimentos.</p>
+        </div>
+    </div>
+    <table>
+        <thead>
+            <tr>
+                <th>#</th>
+                <th>Usuário</th>
+                <th>Perfil</th>
+                <th>GA</th>
+                <th>Ações</th>
+                <th>Cadastros</th>
+                <th>Lançamentos</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for item in lideres_mais_ativos[:5] %}
+            <tr>
+                <td>{{ loop.index }}</td>
+                <td>{{ item.nome }}</td>
+                <td>{{ "Master" if item.role == "MASTER" else "Líder" }}</td>
+                <td>{{ item.lider_ga }}</td>
+                <td><strong>{{ item.total_acoes }}</strong></td>
+                <td>{{ item.adolescentes_cadastrados }}</td>
+                <td>{{ item.cumprimentos_lancados }}</td>
+            </tr>
+            {% else %}
+            <tr><td colspan="7">Ainda não há ações registradas no sistema.</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</section>
 {% endblock %}

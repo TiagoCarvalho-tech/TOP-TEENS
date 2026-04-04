@@ -81,6 +81,19 @@ def init_db():
             )
             cursor.execute(
                 """
+                CREATE TABLE IF NOT EXISTS auditoria_eventos (
+                    id SERIAL PRIMARY KEY,
+                    usuario_id INTEGER REFERENCES usuarios(id) ON DELETE SET NULL,
+                    tipo_evento TEXT NOT NULL,
+                    alvo_tipo TEXT NOT NULL,
+                    alvo_id INTEGER,
+                    detalhes TEXT,
+                    criado_em TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+                )
+                """
+            )
+            cursor.execute(
+                """
                 CREATE INDEX IF NOT EXISTS idx_adolescentes_nome
                 ON adolescentes(nome)
                 """
@@ -95,6 +108,18 @@ def init_db():
                 """
                 CREATE INDEX IF NOT EXISTS idx_cumprimentos_adolescente
                 ON cumprimentos_tarefas(adolescente_id)
+                """
+            )
+            cursor.execute(
+                """
+                CREATE INDEX IF NOT EXISTS idx_auditoria_usuario
+                ON auditoria_eventos(usuario_id, criado_em DESC)
+                """
+            )
+            cursor.execute(
+                """
+                CREATE INDEX IF NOT EXISTS idx_auditoria_evento
+                ON auditoria_eventos(tipo_evento, criado_em DESC)
                 """
             )
 
