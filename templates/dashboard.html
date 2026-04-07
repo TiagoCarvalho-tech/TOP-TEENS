@@ -143,7 +143,6 @@
                 <th>#</th>
                 <th>Usuário</th>
                 <th>Perfil</th>
-                <th>GA</th>
                 <th>Ações</th>
                 <th>Cadastros</th>
                 <th>Lançamentos</th>
@@ -155,13 +154,12 @@
                 <td>{{ loop.index }}</td>
                 <td>{{ item.nome }}</td>
                 <td>{{ "Master" if item.role == "MASTER" else "Líder" }}</td>
-                <td>{{ item.lider_ga }}</td>
                 <td><strong>{{ item.total_acoes }}</strong></td>
                 <td>{{ item.adolescentes_cadastrados }}</td>
                 <td>{{ item.cumprimentos_lancados }}</td>
             </tr>
             {% else %}
-            <tr><td colspan="7">Ainda não há ações registradas no sistema.</td></tr>
+            <tr><td colspan="6">Ainda não há ações registradas no sistema.</td></tr>
             {% endfor %}
         </tbody>
     </table>

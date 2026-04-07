@@ -111,7 +111,6 @@
                 <th>#</th>
                 <th>Nome</th>
                 <th>Perfil</th>
-                <th>GA</th>
                 <th>Total de ações</th>
                 <th>Cadastros</th>
                 <th>Edições de adolescente</th>
@@ -125,7 +124,6 @@
                 <td>{{ loop.index }}</td>
                 <td>{{ item.nome }}</td>
                 <td>{{ "Master" if item.role == "MASTER" else "Líder" }}</td>
-                <td>{{ item.lider_ga }}</td>
                 <td><strong>{{ item.total_acoes }}</strong></td>
                 <td>{{ item.adolescentes_cadastrados }}</td>
                 <td>{{ item.adolescentes_editados }}</td>
@@ -133,7 +131,7 @@
                 <td>{{ item.cumprimentos_editados }}</td>
             </tr>
             {% else %}
-            <tr><td colspan="9">Ainda não há atividade registrada para os usuários.</td></tr>
+            <tr><td colspan="8">Ainda não há atividade registrada para os usuários.</td></tr>
             {% endfor %}
         </tbody>
     </table>

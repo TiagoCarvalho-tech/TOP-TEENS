@@ -23,7 +23,6 @@
                 <th>Contato</th>
                 <th>Aniversário</th>
                 <th>Usuário</th>
-                <th>Líder de GA</th>
                 <th>Solicitado em</th>
                 <th>Ações</th>
             </tr>
@@ -35,7 +34,6 @@
                 <td>{{ usuario.contato or "-" }}</td>
                 <td>{{ usuario.aniversario or "-" }}</td>
                 <td>{{ usuario.username }}</td>
-                <td>{{ usuario.lider_ga }}</td>
                 <td>{{ usuario.criado_em }}</td>
                 <td class="actions">
                     <form method="post" action="{{ url_for('aprovar_usuario', usuario_id=usuario.id) }}">
@@ -49,7 +47,7 @@
                 </td>
             </tr>
             {% else %}
-            <tr><td colspan="7">Nenhuma solicitação pendente.</td></tr>
+            <tr><td colspan="6">Nenhuma solicitação pendente.</td></tr>
             {% endfor %}
         </tbody>
     </table>
@@ -70,7 +68,6 @@
             <tr>
                 <th>Nome</th>
                 <th>Usuário</th>
-                <th>GA</th>
                 <th>Perfil</th>
                 <th>Aniversário</th>
                 <th>Contato</th>
@@ -87,7 +84,6 @@
                     {% endif %}
                 </td>
                 <td>{{ usuario.username }}</td>
-                <td>{{ usuario.lider_ga or "-" }}</td>
                 <td>
                     <span class="role-badge {{ 'role-master' if usuario.role == 'MASTER' else 'role-leader' }}">
                         {{ "Master" if usuario.role == "MASTER" else "Líder" }}
@@ -114,7 +110,7 @@
                 </td>
             </tr>
             {% else %}
-            <tr><td colspan="7">Nenhum usuário aprovado encontrado.</td></tr>
+            <tr><td colspan="6">Nenhum usuário aprovado encontrado.</td></tr>
             {% endfor %}
         </tbody>
     </table>

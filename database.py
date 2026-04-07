@@ -147,3 +147,10 @@ def init_db():
             cursor.execute(
                 "ALTER TABLE cumprimentos_tarefas ADD COLUMN IF NOT EXISTS falta_justificada INTEGER NOT NULL DEFAULT 0"
             )
+            cursor.execute(
+                """
+                UPDATE usuarios
+                SET lider_ga = ''
+                WHERE COALESCE(trim(lider_ga), '') <> ''
+                """
+            )

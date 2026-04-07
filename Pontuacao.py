@@ -121,7 +121,6 @@ def ranking_lideres_mais_ativos():
                 u.nome,
                 u.username,
                 u.role,
-                COALESCE(u.lider_ga, '-') AS lider_ga,
                 COUNT(ae.id) AS total_acoes,
                 COUNT(*) FILTER (WHERE ae.tipo_evento = 'cadastro_adolescente') AS adolescentes_cadastrados,
                 COUNT(*) FILTER (WHERE ae.tipo_evento = 'edicao_adolescente') AS adolescentes_editados,
@@ -137,7 +136,7 @@ def ranking_lideres_mais_ativos():
                     'edicao_cumprimento'
                 )
             WHERE u.aprovado = 1
-            GROUP BY u.id, u.nome, u.username, u.role, u.lider_ga
+            GROUP BY u.id, u.nome, u.username, u.role
             ORDER BY total_acoes DESC, u.nome
             """
         ).fetchall()
