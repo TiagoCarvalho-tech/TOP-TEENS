@@ -39,6 +39,7 @@
         <label>
             Data
             <input type="date" name="data_cumprimento" value="{{ cumprimento.data_cumprimento if cumprimento else today }}" required>
+            <small class="field-help">Para a atividade Presença, o lançamento precisa ser em sábado.</small>
         </label>
         <label>
             Cumpriu?
@@ -47,6 +48,13 @@
                 <option value="1" {% if cumpriu == 1 %}selected{% endif %}>Sim</option>
                 <option value="0" {% if cumpriu == 0 %}selected{% endif %}>Não</option>
             </select>
+        </label>
+        <label class="full-span">
+            <span class="checkbox-inline">
+                <input type="checkbox" name="falta_justificada" value="1" {% if cumprimento and cumprimento.falta_justificada %}checked{% endif %}>
+                Marcar falta justificada
+            </span>
+            <small class="field-help">Use apenas quando a atividade for Presença e o status for Não.</small>
         </label>
         <label class="full-span">
             Observações
@@ -73,6 +81,7 @@
         <label>
             Data
             <input type="date" name="data_cumprimento" value="{{ today }}" required>
+            <small class="field-help">Para a atividade Presença, o lançamento precisa ser em sábado.</small>
         </label>
         <label>
             Status aplicado ao lote
@@ -80,6 +89,13 @@
                 <option value="1" selected>Sim</option>
                 <option value="0">Não</option>
             </select>
+        </label>
+        <label class="full-span">
+            <span class="checkbox-inline">
+                <input type="checkbox" name="falta_justificada" value="1">
+                Marcar falta justificada
+            </span>
+            <small class="field-help">Essa marcação será aplicada apenas para Presença com status Não.</small>
         </label>
         <div class="full-span">
             <span class="field-title">Atividades do mesmo lançamento</span>
@@ -92,6 +108,7 @@
                 </label>
                 {% endfor %}
             </div>
+            <small class="field-help">A atividade Apps não é lançada manualmente: ela vale 40 pontos automaticamente quando o adolescente cumpre a regra das 4 presenças de sábado.</small>
         </div>
         <label class="full-span">
             Observações

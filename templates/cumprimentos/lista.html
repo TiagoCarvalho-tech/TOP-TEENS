@@ -17,6 +17,7 @@
                 <th>Tarefa</th>
                 <th>Data</th>
                 <th>Cumpriu?</th>
+                <th>Falta justificada?</th>
                 <th>Pontos</th>
                 <th>Ações</th>
             </tr>
@@ -28,6 +29,7 @@
                 <td>{{ item.atividade_nome }}</td>
                 <td>{{ item.data_cumprimento }}</td>
                 <td>{{ "Sim" if item.cumpriu else "Não" }}</td>
+                <td>{{ "Sim" if item.falta_justificada else "-" }}</td>
                 <td>{{ item.atividade_pontos if item.cumpriu else 0 }}</td>
                 <td class="actions">
                     <a href="{{ url_for('editar_cumprimento', cumprimento_id=item.id) }}">Editar</a>
@@ -38,7 +40,7 @@
                 </td>
             </tr>
             {% else %}
-            <tr><td colspan="6">Nenhum cumprimento registrado.</td></tr>
+            <tr><td colspan="7">Nenhum cumprimento registrado.</td></tr>
             {% endfor %}
         </tbody>
     </table>

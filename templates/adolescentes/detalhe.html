@@ -16,8 +16,12 @@
         <strong>{{ pontuacao.total_pontos if pontuacao else 0 }}</strong>
     </article>
     <article class="card stat-card">
-        <span>Pontos em cumprimentos</span>
+        <span>Pontos em atividades</span>
         <strong>{{ pontuacao.pontos_tarefas if pontuacao else 0 }}</strong>
+    </article>
+    <article class="card stat-card">
+        <span>Pontos do Apps</span>
+        <strong>{{ pontuacao.pontos_apps if pontuacao else 0 }}</strong>
     </article>
     <article class="card stat-card">
         <span>Total de registros</span>
@@ -35,6 +39,7 @@
                 <th>Data</th>
                 <th>Atividade</th>
                 <th>Status</th>
+                <th>Falta justificada?</th>
                 <th>Pontos</th>
             </tr>
         </thead>
@@ -44,10 +49,11 @@
                 <td>{{ item.data_cumprimento }}</td>
                 <td>{{ item.atividade_nome }}</td>
                 <td>{{ "Sim" if item.cumpriu else "Não" }}</td>
+                <td>{{ "Sim" if item.falta_justificada else "-" }}</td>
                 <td>{{ item.atividade_pontos if item.cumpriu else 0 }}</td>
             </tr>
             {% else %}
-            <tr><td colspan="4">Nenhum cumprimento registrado.</td></tr>
+            <tr><td colspan="5">Nenhum cumprimento registrado.</td></tr>
             {% endfor %}
         </tbody>
     </table>

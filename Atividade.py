@@ -1,8 +1,17 @@
 from database import get_connection
 
 
-def listar_atividades(somente_ativas=False):
-    filtro = "WHERE ativo = 1" if somente_ativas else ""
+def listar_atividades(somente_ativas=False, incluir_apps=True):
+    filtros = []
+    if somente_ativas:
+        filtros.append("ativo = 1")
+    if not incluir_apps:
+        filtros.append("lower(nome) <> lower('Apps')")
+
+    filtro = ""
+    if filtros:
+        filtro = "WHERE " + " AND ".join(filtros)
+
     with get_connection() as connection:
         return connection.execute(
             f"""
@@ -20,6 +29,20 @@ def obter_atividade(atividade_id):
             "SELECT * FROM atividades WHERE id = %s",
             (atividade_id,),
         ).fetchone()
+
+
+def obter_id_atividade_por_nome(nome):
+    with get_connection() as connection:
+        atividade = connection.execute(
+            """
+            SELECT id
+            FROM atividades
+            WHERE lower(nome) = lower(%s)
+            LIMIT 1
+            """,
+            (nome,),
+        ).fetchone()
+    return atividade["id"] if atividade else None
 
 
 def cadastrar_atividade(dados):
@@ -100,61 +123,85 @@ def obter_cumprimento(cumprimento_id):
 
 
 def registrar_cumprimento(dados):
+    presenca_id = dados.get("presenca_id")
+    atividade_id = int(dados["atividade_id"])
+    cumpriu = int(dados["cumpriu"])
+    falta_justificada = 0
+    if presenca_id is not None and atividade_id == int(presenca_id) and cumpriu == 0:
+        falta_justificada = int(str(dados.get("falta_justificada", "0")).strip() == "1")
+
     with get_connection() as connection:
         return connection.execute(
             """
             INSERT INTO cumprimentos_tarefas (
-                adolescente_id, atividade_id, data_cumprimento, cumpriu, observacoes
-            ) VALUES (%s, %s, %s, %s, %s)
+                adolescente_id, atividade_id, data_cumprimento, cumpriu, observacoes, falta_justificada
+            ) VALUES (%s, %s, %s, %s, %s, %s)
             RETURNING id, atividade_id
             """,
             (
                 int(dados["adolescente_id"]),
-                int(dados["atividade_id"]),
+                atividade_id,
                 dados["data_cumprimento"],
-                int(dados["cumpriu"]),
+                cumpriu,
                 dados.get("observacoes", "").strip(),
+                falta_justificada,
             ),
         ).fetchone()
 
 
-def registrar_cumprimentos_em_lote(dados, atividade_ids):
+def registrar_cumprimentos_em_lote(dados, atividade_ids, presenca_id=None):
+    cumpriu = int(dados["cumpriu"])
+    justificou = int(str(dados.get("falta_justificada", "0")).strip() == "1")
+
     with get_connection() as connection:
         registros = []
         for atividade_id in atividade_ids:
+            atividade_id_int = int(atividade_id)
+            falta_justificada = 0
+            if presenca_id is not None and atividade_id_int == int(presenca_id) and cumpriu == 0:
+                falta_justificada = justificou
+
             registro = connection.execute(
                 """
                 INSERT INTO cumprimentos_tarefas (
-                    adolescente_id, atividade_id, data_cumprimento, cumpriu, observacoes
-                ) VALUES (%s, %s, %s, %s, %s)
+                    adolescente_id, atividade_id, data_cumprimento, cumpriu, observacoes, falta_justificada
+                ) VALUES (%s, %s, %s, %s, %s, %s)
                 RETURNING id, atividade_id
                 """,
                 (
                     int(dados["adolescente_id"]),
-                    int(atividade_id),
+                    atividade_id_int,
                     dados["data_cumprimento"],
-                    int(dados["cumpriu"]),
+                    cumpriu,
                     dados.get("observacoes", "").strip(),
+                    falta_justificada,
                 ),
             ).fetchone()
             registros.append(registro)
     return registros
 
 
-def atualizar_cumprimento(cumprimento_id, dados):
+def atualizar_cumprimento(cumprimento_id, dados, presenca_id=None):
+    atividade_id = int(dados["atividade_id"])
+    cumpriu = int(dados["cumpriu"])
+    falta_justificada = 0
+    if presenca_id is not None and atividade_id == int(presenca_id) and cumpriu == 0:
+        falta_justificada = int(str(dados.get("falta_justificada", "0")).strip() == "1")
+
     with get_connection() as connection:
         connection.execute(
             """
             UPDATE cumprimentos_tarefas
-            SET adolescente_id = %s, atividade_id = %s, data_cumprimento = %s, cumpriu = %s, observacoes = %s
+            SET adolescente_id = %s, atividade_id = %s, data_cumprimento = %s, cumpriu = %s, observacoes = %s, falta_justificada = %s
             WHERE id = %s
             """,
             (
                 int(dados["adolescente_id"]),
-                int(dados["atividade_id"]),
+                atividade_id,
                 dados["data_cumprimento"],
-                int(dados["cumpriu"]),
+                cumpriu,
                 dados.get("observacoes", "").strip(),
+                falta_justificada,
                 cumprimento_id,
             ),
         )

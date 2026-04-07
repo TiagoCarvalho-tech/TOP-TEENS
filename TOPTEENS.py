@@ -94,6 +94,13 @@ def obter_lider_ga_usuario():
     return normalizar_texto(session.get("usuario_lider_ga", ""))
 
 
+def data_eh_sabado(valor_data):
+    try:
+        return datetime.strptime(valor_data, "%Y-%m-%d").weekday() == 5
+    except (TypeError, ValueError):
+        return False
+
+
 def criar_usuario_padrao():
     with get_connection() as connection:
         usuario = connection.execute(
@@ -302,12 +309,32 @@ def validar_troca_senha(formulario):
     return validar_password_forte(nova_senha)
 
 
+def validar_atualizacao_perfil(formulario):
+    aniversario = formulario.get("aniversario")
+
+    erro_aniversario = None
+    if not aniversario:
+        erro_aniversario = "O campo Aniversário é obrigatório."
+    else:
+        erro_aniversario = validar_nascimento(aniversario)
+        if erro_aniversario:
+            erro_aniversario = erro_aniversario.replace("Data de nascimento", "Aniversário")
+
+    for erro in [
+        validar_nome_pessoa(formulario.get("nome"), "Nome"),
+        "O campo Contato é obrigatório." if not normalizar_texto(formulario.get("contato")) else validar_contato(formulario.get("contato")),
+        erro_aniversario,
+    ]:
+        if erro:
+            return erro
+    return None
+
+
 def validar_cadastro_usuario(formulario):
     nome = normalizar_texto(formulario.get("nome"))
     contato = normalizar_texto(formulario.get("contato"))
     aniversario = formulario.get("aniversario")
     username = normalizar_texto(formulario.get("username")).lower()
-    lider_ga = normalizar_texto(formulario.get("lider_ga"))
     senha = formulario.get("senha", "")
     confirmar = formulario.get("confirmar_senha", "")
 
@@ -323,7 +350,6 @@ def validar_cadastro_usuario(formulario):
         validar_nome_pessoa(nome, "Nome"),
         "O campo Contato é obrigatório." if not contato else validar_contato(contato),
         erro_aniversario,
-        validar_lider_ga(lider_ga),
     ]:
         if erro:
             return erro
@@ -339,17 +365,11 @@ def validar_cadastro_usuario(formulario):
 
 
 def usuario_pode_acessar_adolescente(adolescente):
-    if adolescente is None:
-        return False
-    if usuario_master():
-        return True
-    return adolescente["lider_ga"] == obter_lider_ga_usuario()
+    return adolescente is not None
 
 
 def adolescentes_disponiveis():
-    if usuario_master():
-        return Adolescente.listar_adolescentes()
-    return Adolescente.listar_adolescentes(lider_ga=obter_lider_ga_usuario())
+    return Adolescente.listar_adolescentes()
 
 
 def obter_adolescente_com_permissao(adolescente_id):
@@ -487,7 +507,6 @@ def cadastro_usuario():
             contato = Adolescente.normalizar_contato(request.form["contato"])
             aniversario = request.form["aniversario"]
             username = normalizar_texto(request.form["username"]).lower()
-            lider_ga = normalizar_texto(request.form["lider_ga"])
 
             with get_connection() as connection:
                 existente = connection.execute(
@@ -510,7 +529,7 @@ def cadastro_usuario():
                             aniversario,
                             username,
                             generate_password_hash(request.form["senha"]),
-                            lider_ga,
+                            "",
                         ),
                     )
                     flash("Cadastro enviado com sucesso. Aguarde a aprovação do usuário master.", "success")
@@ -729,6 +748,45 @@ def alterar_senha():
     return render_template("seguranca_senha.html")
 
 
+@app.route("/perfil", methods=["GET", "POST"])
+@login_obrigatorio
+def editar_meu_cadastro():
+    with get_connection() as connection:
+        usuario = connection.execute(
+            "SELECT * FROM usuarios WHERE id = %s",
+            (session["usuario_id"],),
+        ).fetchone()
+
+        if usuario is None:
+            session.clear()
+            flash("Sessão expirada. Faça login novamente.", "warning")
+            return redirect(url_for("login"))
+
+        if request.method == "POST":
+            erro = validar_atualizacao_perfil(request.form)
+            if erro:
+                flash(erro, "danger")
+            else:
+                nome = normalizar_texto(request.form["nome"])
+                contato = Adolescente.normalizar_contato(request.form["contato"])
+                aniversario = request.form["aniversario"]
+
+                connection.execute(
+                    """
+                    UPDATE usuarios
+                    SET nome = %s, contato = %s, aniversario = %s
+                    WHERE id = %s
+                    """,
+                    (nome, contato, aniversario, usuario["id"]),
+                )
+                session["usuario_nome"] = nome
+                registrar_auditoria("edicao_perfil", "usuario", usuario["id"], "Perfil atualizado pelo próprio usuário.")
+                flash("Cadastro atualizado com sucesso.", "success")
+                return redirect(url_for("dashboard"))
+
+    return render_template("perfil_usuario.html", usuario=usuario)
+
+
 @app.route("/dashboard")
 @login_obrigatorio
 def dashboard():
@@ -754,9 +812,6 @@ def listar_adolescentes():
     lider_ga = normalizar_texto(request.args.get("lider_ga", ""))
     sexo = request.args.get("sexo", "").strip()
 
-    if not usuario_master():
-        lider_ga = obter_lider_ga_usuario()
-
     adolescentes = Adolescente.listar_adolescentes(busca, lider_ga, sexo)
     lideres = Adolescente.listar_lideres_ga()
     return render_template(
@@ -776,8 +831,6 @@ def novo_adolescente():
             flash(erro, "danger")
         else:
             dados = dict(request.form)
-            if not usuario_master():
-                dados["lider_ga"] = obter_lider_ga_usuario()
             adolescente = Adolescente.cadastrar_adolescente(dados)
             registrar_auditoria(
                 "cadastro_adolescente",
@@ -804,8 +857,6 @@ def editar_adolescente(adolescente_id):
             flash(erro, "danger")
         else:
             dados = dict(request.form)
-            if not usuario_master():
-                dados["lider_ga"] = obter_lider_ga_usuario()
             Adolescente.atualizar_adolescente(adolescente_id, dados)
             registrar_auditoria(
                 "edicao_adolescente",
@@ -911,7 +962,7 @@ def listar_cumprimentos():
     adolescentes = adolescentes_disponiveis()
     ids_permitidos = {item["id"] for item in adolescentes}
     cumprimentos = [item for item in Atividade.listar_cumprimentos() if item["adolescente_id"] in ids_permitidos]
-    atividades = Atividade.listar_atividades(somente_ativas=True)
+    atividades = Atividade.listar_atividades(somente_ativas=True, incluir_apps=False)
     return render_template(
         "cumprimentos/lista.html",
         cumprimentos=cumprimentos,
@@ -926,13 +977,24 @@ def novo_cumprimento():
     if request.method == "POST":
         erro = validar_campos_cumprimento_lote(request.form)
         adolescente = verificar_adolescente_do_formulario()
+        presenca_id = Atividade.obter_id_atividade_por_nome("Presença")
         if erro:
             flash(erro, "danger")
         elif adolescente is None:
             flash("Você não tem permissão para lançar tarefa para este adolescente.", "danger")
         else:
             atividade_ids = [item for item in request.form.getlist("atividade_ids") if item.strip()]
-            registros = Atividade.registrar_cumprimentos_em_lote(request.form, atividade_ids)
+            atividade_ids_int = {int(item) for item in atividade_ids}
+            if presenca_id and presenca_id in atividade_ids_int and not data_eh_sabado(request.form.get("data_cumprimento")):
+                flash("A atividade Presença só pode ser lançada em sábados.", "danger")
+                return render_template(
+                    "cumprimentos/formulario.html",
+                    cumprimento=None,
+                    adolescentes=adolescentes_disponiveis(),
+                    atividades=Atividade.listar_atividades(somente_ativas=True, incluir_apps=False),
+                )
+
+            registros = Atividade.registrar_cumprimentos_em_lote(request.form, atividade_ids, presenca_id=presenca_id)
             for registro in registros:
                 registrar_auditoria(
                     "lancamento_cumprimento",
@@ -947,7 +1009,7 @@ def novo_cumprimento():
         "cumprimentos/formulario.html",
         cumprimento=None,
         adolescentes=adolescentes_disponiveis(),
-        atividades=Atividade.listar_atividades(somente_ativas=True),
+        atividades=Atividade.listar_atividades(somente_ativas=True, incluir_apps=False),
     )
 
 
@@ -959,15 +1021,21 @@ def editar_cumprimento(cumprimento_id):
         flash("Registro de cumprimento não encontrado ou sem permissão de acesso.", "danger")
         return redirect(url_for("listar_cumprimentos"))
 
+    atividade_apps_id = Atividade.obter_id_atividade_por_nome("Apps")
+    incluir_apps = bool(atividade_apps_id and cumprimento["atividade_id"] == atividade_apps_id)
+
     if request.method == "POST":
         erro = validar_campos_cumprimento(request.form)
         adolescente = verificar_adolescente_do_formulario()
+        presenca_id = Atividade.obter_id_atividade_por_nome("Presença")
         if erro:
             flash(erro, "danger")
         elif adolescente is None:
             flash("Você não tem permissão para lançar tarefa para este adolescente.", "danger")
+        elif presenca_id and request.form.get("atividade_id", "").isdigit() and int(request.form["atividade_id"]) == presenca_id and not data_eh_sabado(request.form.get("data_cumprimento")):
+            flash("A atividade Presença só pode ser lançada em sábados.", "danger")
         else:
-            Atividade.atualizar_cumprimento(cumprimento_id, request.form)
+            Atividade.atualizar_cumprimento(cumprimento_id, request.form, presenca_id=presenca_id)
             registrar_auditoria(
                 "edicao_cumprimento",
                 "cumprimento",
@@ -981,7 +1049,7 @@ def editar_cumprimento(cumprimento_id):
         "cumprimentos/formulario.html",
         cumprimento=cumprimento,
         adolescentes=adolescentes_disponiveis(),
-        atividades=Atividade.listar_atividades(somente_ativas=True),
+        atividades=Atividade.listar_atividades(somente_ativas=True, incluir_apps=incluir_apps),
     )
 
 

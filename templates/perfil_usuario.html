@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+
+{% block content %}
+<section class="page-head">
+    <div>
+        <p class="section-tag">Minha conta</p>
+        <h2>Editar meu cadastro</h2>
+    </div>
+</section>
+
+<section class="card">
+    <form method="post" class="form-grid two-cols">
+        <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
+        <label>
+            Nome completo
+            <input type="text" name="nome" maxlength="80" pattern="[A-Za-zÀ-ÿ' -]{3,80}" value="{{ usuario.nome }}" required>
+        </label>
+        <label>
+            Contato
+            <input type="tel" name="contato" maxlength="15" placeholder="(92) 99999-9999" value="{{ usuario.contato or '' }}" required>
+        </label>
+        <label>
+            Aniversário
+            <input type="date" name="aniversario" min="1950-01-01" max="{{ today }}" value="{{ usuario.aniversario or '' }}" required>
+        </label>
+        <label>
+            Nome de usuário
+            <input type="text" value="{{ usuario.username }}" readonly>
+            <small class="field-help">O nome de usuário é fixo por segurança.</small>
+        </label>
+        <div class="form-actions">
+            <button type="submit">Salvar meu cadastro</button>
+        </div>
+    </form>
+</section>
+{% endblock %}

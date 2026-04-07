@@ -5,13 +5,64 @@ def ranking_geral():
     with get_connection() as connection:
         return connection.execute(
             """
-            WITH pontos_tarefas AS (
+            WITH atividade_apps AS (
+                SELECT id, pontos
+                FROM atividades
+                WHERE lower(nome) = lower('Apps')
+                LIMIT 1
+            ),
+            atividade_presenca AS (
+                SELECT id
+                FROM atividades
+                WHERE lower(nome) = lower('Presença')
+                LIMIT 1
+            ),
+            pontos_tarefas AS (
                 SELECT
                     ct.adolescente_id,
-                    SUM(CASE WHEN ct.cumpriu = 1 THEN a.pontos ELSE 0 END) AS total_tarefas
+                    SUM(
+                        CASE
+                            WHEN ct.cumpriu = 1
+                                 AND ct.atividade_id <> COALESCE((SELECT id FROM atividade_apps), -1)
+                            THEN a.pontos
+                            ELSE 0
+                        END
+                    ) AS total_tarefas
                 FROM cumprimentos_tarefas ct
                 JOIN atividades a ON a.id = ct.atividade_id
                 GROUP BY ct.adolescente_id
+            ),
+            presencas_ordenadas AS (
+                SELECT
+                    ct.adolescente_id,
+                    ct.cumpriu,
+                    ct.falta_justificada,
+                    ROW_NUMBER() OVER (
+                        PARTITION BY ct.adolescente_id
+                        ORDER BY ct.data_cumprimento DESC, ct.id DESC
+                    ) AS posicao
+                FROM cumprimentos_tarefas ct
+                JOIN atividade_presenca ap ON ap.id = ct.atividade_id
+            ),
+            presencas_recentes AS (
+                SELECT *
+                FROM presencas_ordenadas
+                WHERE posicao <= 4
+            ),
+            pontos_apps AS (
+                SELECT
+                    pr.adolescente_id,
+                    CASE
+                        WHEN COUNT(*) = 4 AND SUM(CASE WHEN pr.cumpriu = 1 THEN 1 ELSE 0 END) = 4
+                            THEN COALESCE((SELECT pontos FROM atividade_apps), 40)
+                        WHEN COUNT(*) = 4
+                             AND SUM(CASE WHEN pr.cumpriu = 1 THEN 1 ELSE 0 END) = 3
+                             AND SUM(CASE WHEN pr.cumpriu = 0 AND pr.falta_justificada = 1 THEN 1 ELSE 0 END) >= 1
+                            THEN COALESCE((SELECT pontos FROM atividade_apps), 40)
+                        ELSE 0
+                    END AS total_apps
+                FROM presencas_recentes pr
+                GROUP BY pr.adolescente_id
             )
             SELECT
                 ad.id,
@@ -20,9 +71,11 @@ def ranking_geral():
                 ad.sexo,
                 ad.lider_ga,
                 COALESCE(pt.total_tarefas, 0) AS pontos_tarefas,
-                COALESCE(pt.total_tarefas, 0) AS total_pontos
+                COALESCE(pa.total_apps, 0) AS pontos_apps,
+                COALESCE(pt.total_tarefas, 0) + COALESCE(pa.total_apps, 0) AS total_pontos
             FROM adolescentes ad
             LEFT JOIN pontos_tarefas pt ON pt.adolescente_id = ad.id
+            LEFT JOIN pontos_apps pa ON pa.adolescente_id = ad.id
             ORDER BY total_pontos DESC, ad.nome
             """
         ).fetchall()
@@ -41,27 +94,22 @@ def ranking_por_sexo():
 
 
 def ranking_por_lider_ga():
-    with get_connection() as connection:
-        return connection.execute(
-            """
-            WITH pontos_tarefas AS (
-                SELECT
-                    ct.adolescente_id,
-                    SUM(CASE WHEN ct.cumpriu = 1 THEN a.pontos ELSE 0 END) AS total_tarefas
-                FROM cumprimentos_tarefas ct
-                JOIN atividades a ON a.id = ct.atividade_id
-                GROUP BY ct.adolescente_id
-            )
-            SELECT
-                ad.lider_ga,
-                COUNT(ad.id) AS total_adolescentes,
-                COALESCE(SUM(COALESCE(pt.total_tarefas, 0)), 0) AS total_pontos
-            FROM adolescentes ad
-            LEFT JOIN pontos_tarefas pt ON pt.adolescente_id = ad.id
-            GROUP BY ad.lider_ga
-            ORDER BY total_pontos DESC, ad.lider_ga
-            """
-        ).fetchall()
+    acumulado = {}
+    for item in ranking_geral():
+        lider = item["lider_ga"] or "-"
+        if lider not in acumulado:
+            acumulado[lider] = {
+                "lider_ga": lider,
+                "total_adolescentes": 0,
+                "total_pontos": 0,
+            }
+        acumulado[lider]["total_adolescentes"] += 1
+        acumulado[lider]["total_pontos"] += item["total_pontos"]
+
+    return sorted(
+        acumulado.values(),
+        key=lambda x: (-x["total_pontos"], x["lider_ga"]),
+    )
 
 
 def ranking_lideres_mais_ativos():

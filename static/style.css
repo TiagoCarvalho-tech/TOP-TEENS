@@ -341,6 +341,18 @@ label {
     line-height: 1.5;
 }
 
+.checkbox-inline {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.checkbox-inline input {
+    width: 18px;
+    height: 18px;
+    margin: 0;
+}
+
 .table-note {
     margin-top: 6px;
     color: var(--muted);

@@ -18,7 +18,7 @@
 
                 <div class="user-chip">
                     <strong>{{ session.get("usuario_nome") }}</strong>
-                    <span>{{ "Master" if session.get("usuario_role") == "MASTER" else session.get("usuario_lider_ga") }}</span>
+                    <span>{{ "Master" if session.get("usuario_role") == "MASTER" else "Líder" }}</span>
                 </div>
             </div>
 
@@ -31,6 +31,7 @@
                 {% if usuario_master() %}
                 <a href="{{ url_for('usuarios_aprovacoes') }}">Aprovações</a>
                 {% endif %}
+                <a href="{{ url_for('editar_meu_cadastro') }}">Meu cadastro</a>
                 <a href="{{ url_for('alterar_senha') }}">Segurança</a>
                 <a href="{{ url_for('logout') }}">Sair</a>
             </nav>

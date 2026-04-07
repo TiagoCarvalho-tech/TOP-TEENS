@@ -19,7 +19,8 @@
                 <th>Adolescente</th>
                 <th>Gênero</th>
                 <th>GA</th>
-                <th>Pontos em cumprimentos</th>
+                <th>Pontos em atividades</th>
+                <th>Pontos Apps</th>
                 <th>Total</th>
             </tr>
         </thead>
@@ -31,10 +32,11 @@
                 <td>{{ "Masculino" if item.sexo == "M" else "Feminino" }}</td>
                 <td>{{ item.lider_ga }}</td>
                 <td>{{ item.pontos_tarefas }}</td>
+                <td>{{ item.pontos_apps }}</td>
                 <td><strong>{{ item.total_pontos }}</strong></td>
             </tr>
             {% else %}
-            <tr><td colspan="6">Nenhuma pontuação disponível.</td></tr>
+            <tr><td colspan="7">Nenhuma pontuação disponível.</td></tr>
             {% endfor %}
         </tbody>
     </table>

@@ -42,11 +42,7 @@
         </label>
         <label class="full-span">
             Líder de GA
-            {% if usuario_master() %}
             <input type="text" name="lider_ga" maxlength="80" pattern="[A-Za-zÀ-ÿ' -]{3,80}" value="{{ adolescente.lider_ga if adolescente else '' }}" required>
-            {% else %}
-            <input type="text" name="lider_ga" value="{{ session.get('usuario_lider_ga') }}" readonly required>
-            {% endif %}
         </label>
         <div class="form-actions">
             <button type="submit">{% if adolescente %}Salvar alterações{% else %}Cadastrar adolescente{% endif %}</button>
