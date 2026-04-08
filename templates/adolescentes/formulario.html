@@ -32,13 +32,16 @@
                 <option value="F" {% if sexo == 'F' %}selected{% endif %}>Feminino</option>
             </select>
         </label>
-        <label>
-            Pai
-            <input type="text" name="pai" maxlength="80" pattern="[A-Za-zÀ-ÿ' -]{0,80}" value="{{ adolescente.pai if adolescente else '' }}">
-        </label>
-        <label>
-            Mãe
-            <input type="text" name="mae" maxlength="80" pattern="[A-Za-zÀ-ÿ' -]{0,80}" value="{{ adolescente.mae if adolescente else '' }}">
+        <label class="full-span">
+            Nome do Responsável
+            <input
+                type="text"
+                name="responsavel"
+                maxlength="80"
+                pattern="[A-Za-zÀ-ÿ' -]{3,80}"
+                value="{{ adolescente.pai if adolescente and adolescente.pai else (adolescente.mae if adolescente and adolescente.mae else '') }}"
+                required
+            >
         </label>
         <label class="full-span">
             Líder de GA

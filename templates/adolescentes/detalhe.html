@@ -6,6 +6,7 @@
         <p class="section-tag">Perfil</p>
         <h2>{{ adolescente.nome }}</h2>
         <p class="muted">Matrícula {{ adolescente.matricula }} • Líder de GA: {{ adolescente.lider_ga }}</p>
+        <p class="muted">Responsável: {{ adolescente.pai if adolescente.pai else (adolescente.mae if adolescente.mae else "-") }}</p>
     </div>
     <a class="button-link" href="{{ url_for('editar_adolescente', adolescente_id=adolescente.id) }}">Editar cadastro</a>
 </section>

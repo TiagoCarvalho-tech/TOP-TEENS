@@ -250,8 +250,7 @@ def validar_campos_adolescente(formulario):
         validar_nome_pessoa(formulario.get("nome"), "Nome"),
         validar_nascimento(formulario.get("nascimento")),
         validar_contato(formulario.get("contato")),
-        validar_nome_pessoa(formulario.get("pai"), "Pai", obrigatorio=False),
-        validar_nome_pessoa(formulario.get("mae"), "Mãe", obrigatorio=False),
+        validar_nome_pessoa(formulario.get("responsavel"), "Nome do Responsável"),
         validar_lider_ga(formulario.get("lider_ga")),
     ]:
         if erro:
