@@ -808,14 +808,12 @@ def dashboard():
     resumo = Pontuacao.resumo_dashboard()
     aniversariantes = Adolescente.aniversariantes_proximos()
     ranking_genero = Pontuacao.ranking_por_sexo()
-    ranking_lider_ga = Pontuacao.ranking_por_lider_ga()
     lideres_mais_ativos = Pontuacao.ranking_lideres_mais_ativos()
     return render_template(
         "dashboard.html",
         resumo=resumo,
         aniversariantes=aniversariantes,
         ranking_genero=ranking_genero,
-        ranking_lider_ga=ranking_lider_ga,
         lideres_mais_ativos=lideres_mais_ativos,
     )
 
@@ -1178,7 +1176,6 @@ def ranking():
         "ranking.html",
         ranking=Pontuacao.ranking_geral(),
         ranking_genero=Pontuacao.ranking_por_sexo(),
-        ranking_lider_ga=Pontuacao.ranking_por_lider_ga(),
         lideres_mais_ativos=Pontuacao.ranking_lideres_mais_ativos(),
     )
 

@@ -5,7 +5,7 @@
     <div>
         <p class="section-tag">Painel geral</p>
         <h2>Controle completo do Nova Teens</h2>
-        <p class="muted">Acompanhe pontuação, aniversários e a performance por gênero e por líder de GA.</p>
+        <p class="muted">Acompanhe pontuação, aniversários e a performance por gênero.</p>
     </div>
     <div class="hero-actions">
         <a class="button-link" href="{{ url_for('novo_adolescente') }}">Novo adolescente</a>
@@ -100,34 +100,6 @@
             {% endfor %}
         </ol>
     </article>
-</section>
-
-<section class="card">
-    <div class="card-head">
-        <h3>Ranking por líder de GA</h3>
-    </div>
-    <table>
-        <thead>
-            <tr>
-                <th>#</th>
-                <th>Líder de GA</th>
-                <th>Adolescentes</th>
-                <th>Pontos</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for item in ranking_lider_ga[:5] %}
-            <tr>
-                <td>{{ loop.index }}</td>
-                <td>{{ item.lider_ga }}</td>
-                <td>{{ item.total_adolescentes }}</td>
-                <td><strong>{{ item.total_pontos }}</strong></td>
-            </tr>
-            {% else %}
-            <tr><td colspan="4">Nenhum líder de GA disponível.</td></tr>
-            {% endfor %}
-        </tbody>
-    </table>
 </section>
 
 <section class="card">
