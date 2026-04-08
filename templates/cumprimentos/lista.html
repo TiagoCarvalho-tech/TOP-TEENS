@@ -10,39 +10,111 @@
 </section>
 
 <section class="card">
+    <form method="get" class="filters">
+        <input
+            type="text"
+            name="busca"
+            maxlength="80"
+            placeholder="Filtrar por nome do adolescente"
+            value="{{ filtros.busca }}"
+        >
+        <button type="submit">Buscar</button>
+    </form>
+</section>
+
+<section class="card">
+    <div class="card-head">
+        <h3>Adolescentes com lançamentos</h3>
+    </div>
     <table>
         <thead>
             <tr>
                 <th>Adolescente</th>
-                <th>Tarefa</th>
+                <th>Matrícula</th>
+                <th>Dias lançados</th>
+                <th>Total de itens</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for item in adolescentes %}
+            <tr>
+                <td>
+                    <a href="{{ url_for('listar_cumprimentos', busca=filtros.busca, adolescente_id=item.id) }}">
+                        {{ item.nome }}
+                    </a>
+                </td>
+                <td>{{ item.matricula }}</td>
+                <td>{{ item.total_datas }}</td>
+                <td>{{ item.total_registros }}</td>
+            </tr>
+            {% else %}
+            <tr><td colspan="4">Nenhum adolescente encontrado para esse filtro.</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</section>
+
+{% if adolescente_selecionado %}
+<section class="card">
+    <div class="card-head">
+        <h3>Datas lançadas de {{ adolescente_selecionado.nome }}</h3>
+    </div>
+    <table>
+        <thead>
+            <tr>
                 <th>Data</th>
-                <th>Cumpriu?</th>
+                <th>Itens lançados</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for item in datas_lancamentos %}
+            <tr>
+                <td>
+                    <a href="{{ url_for('listar_cumprimentos', busca=filtros.busca, adolescente_id=adolescente_selecionado.id, data_cumprimento=item.data_cumprimento) }}">
+                        {{ item.data_cumprimento }}
+                    </a>
+                </td>
+                <td>{{ item.total_itens }}</td>
+            </tr>
+            {% else %}
+            <tr><td colspan="2">Nenhuma data de lançamento para este adolescente.</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</section>
+{% endif %}
+
+{% if adolescente_selecionado and filtros.data_cumprimento %}
+<section class="card">
+    <div class="card-head">
+        <h3>Lançamentos de {{ adolescente_selecionado.nome }} em {{ filtros.data_cumprimento }}</h3>
+    </div>
+    <table>
+        <thead>
+            <tr>
+                <th>Atividade</th>
+                <th>Status</th>
                 <th>Falta justificada?</th>
                 <th>Pontos</th>
                 <th>Ações</th>
             </tr>
         </thead>
         <tbody>
-            {% for item in cumprimentos %}
+            {% for item in lancamentos_da_data %}
             <tr>
-                <td>{{ item.adolescente_nome }}</td>
                 <td>{{ item.atividade_nome }}</td>
-                <td>{{ item.data_cumprimento }}</td>
                 <td>{{ "Sim" if item.cumpriu else "Não" }}</td>
                 <td>{{ "Sim" if item.falta_justificada else "-" }}</td>
                 <td>{{ item.atividade_pontos if item.cumpriu else 0 }}</td>
                 <td class="actions">
                     <a href="{{ url_for('editar_cumprimento', cumprimento_id=item.id) }}">Editar</a>
-                    <form method="post" action="{{ url_for('excluir_cumprimento', cumprimento_id=item.id) }}">
-                        <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
-                        <button type="submit" class="button-link danger">Excluir</button>
-                    </form>
                 </td>
             </tr>
             {% else %}
-            <tr><td colspan="7">Nenhum cumprimento registrado.</td></tr>
+            <tr><td colspan="5">Nenhum lançamento encontrado nessa data.</td></tr>
             {% endfor %}
         </tbody>
     </table>
 </section>
+{% endif %}
 {% endblock %}

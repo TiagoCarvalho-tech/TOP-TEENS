@@ -31,6 +31,48 @@ def obter_atividade(atividade_id):
         ).fetchone()
 
 
+def existe_cumprimento_no_dia(adolescente_id, atividade_id, data_cumprimento, excluir_id=None):
+    consulta = """
+        SELECT id
+        FROM cumprimentos_tarefas
+        WHERE adolescente_id = %s
+          AND atividade_id = %s
+          AND data_cumprimento = %s
+    """
+    parametros = [int(adolescente_id), int(atividade_id), data_cumprimento]
+
+    if excluir_id is not None:
+        consulta += " AND id <> %s"
+        parametros.append(int(excluir_id))
+
+    consulta += " LIMIT 1"
+
+    with get_connection() as connection:
+        row = connection.execute(consulta, parametros).fetchone()
+    return row is not None
+
+
+def mapa_datas_lancadas_por_atividade(atividade_id):
+    with get_connection() as connection:
+        rows = connection.execute(
+            """
+            SELECT adolescente_id, data_cumprimento
+            FROM cumprimentos_tarefas
+            WHERE atividade_id = %s
+            ORDER BY data_cumprimento
+            """,
+            (int(atividade_id),),
+        ).fetchall()
+
+    resultado = {}
+    for row in rows:
+        chave = str(row["adolescente_id"])
+        resultado.setdefault(chave, [])
+        if row["data_cumprimento"] not in resultado[chave]:
+            resultado[chave].append(row["data_cumprimento"])
+    return resultado
+
+
 def obter_id_atividade_por_nome(nome):
     with get_connection() as connection:
         atividade = connection.execute(

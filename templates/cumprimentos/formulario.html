@@ -65,7 +65,13 @@
         </div>
     </form>
     {% else %}
-    <form method="post" class="form-grid two-cols">
+    <form
+        id="novo-cumprimento-form"
+        method="post"
+        class="form-grid two-cols"
+        data-presenca-id="{{ presenca_id or '' }}"
+        data-datas-presenca='{{ datas_presenca_por_adolescente | tojson }}'
+    >
         <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
         <label>
             Adolescente
@@ -80,8 +86,9 @@
         </label>
         <label>
             Data
-            <input type="date" name="data_cumprimento" value="{{ today }}" required>
+            <input id="novo-cumprimento-data" type="date" name="data_cumprimento" value="{{ today }}" required>
             <small class="field-help">Na 1ª fase do Top Teens, a atividade Presença só pode ser lançada nas datas: 15/03/2026, 22/03/2026, 29/03/2026 e 12/04/2026.</small>
+            <small id="datas-presenca-bloqueadas" class="field-help"></small>
         </label>
         <label>
             Adolescente estava presente
@@ -120,4 +127,10 @@
     </form>
     {% endif %}
 </section>
+{% endblock %}
+
+{% block extra_scripts %}
+{% if not cumprimento %}
+<script src="{{ url_for('static', filename='cumprimentos.js') }}" defer></script>
+{% endif %}
 {% endblock %}

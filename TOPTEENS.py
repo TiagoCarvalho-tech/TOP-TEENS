@@ -144,6 +144,7 @@ def popular_atividades_iniciais():
         "Meditação": "Meditação e versículo",
         "Apps": "APPS",
     }
+    nomes_oficiais = {nome.lower() for nome, _, _ in atividades_padrao}
 
     with get_connection() as connection:
         # Migração simples de nomes antigos para os novos, sem mexer nos pontos já ajustados manualmente.
@@ -176,6 +177,15 @@ def popular_atividades_iniciais():
                     """,
                     (nome, pontos, descricao),
                 )
+
+        # Mantém somente as atividades oficiais ativas.
+        connection.execute(
+            """
+            UPDATE atividades
+            SET ativo = CASE WHEN lower(nome) = ANY(%s) THEN 1 ELSE 0 END
+            """,
+            (list(nomes_oficiais),),
+        )
 
 
 def validar_password_forte(senha):
@@ -964,25 +974,80 @@ def excluir_atividade(atividade_id):
 @app.route("/cumprimentos")
 @login_obrigatorio
 def listar_cumprimentos():
+    busca = normalizar_texto(request.args.get("busca", ""))
+    adolescente_id_param = request.args.get("adolescente_id", "").strip()
+    data_param = request.args.get("data_cumprimento", "").strip()
+
     adolescentes = adolescentes_disponiveis()
     ids_permitidos = {item["id"] for item in adolescentes}
+    adolescentes_por_id = {item["id"]: item for item in adolescentes}
     cumprimentos = [item for item in Atividade.listar_cumprimentos() if item["adolescente_id"] in ids_permitidos]
-    atividades = Atividade.listar_atividades(somente_ativas=True, incluir_apps=False)
+
+    if busca:
+        termo = busca.lower()
+        adolescentes = [item for item in adolescentes if termo in item["nome"].lower()]
+
+    registros_por_adolescente = {}
+    for item in cumprimentos:
+        registros_por_adolescente.setdefault(item["adolescente_id"], []).append(item)
+
+    adolescentes_resumo = []
+    for adolescente in adolescentes:
+        registros = registros_por_adolescente.get(adolescente["id"], [])
+        datas_unicas = sorted({item["data_cumprimento"] for item in registros}, reverse=True)
+        adolescentes_resumo.append(
+            {
+                "id": adolescente["id"],
+                "nome": adolescente["nome"],
+                "matricula": adolescente["matricula"],
+                "total_registros": len(registros),
+                "total_datas": len(datas_unicas),
+            }
+        )
+
+    adolescente_selecionado = None
+    datas_lancamentos = []
+    lancamentos_da_data = []
+
+    if adolescente_id_param.isdigit():
+        adolescente_id = int(adolescente_id_param)
+        if adolescente_id in ids_permitidos:
+            adolescente_selecionado = adolescentes_por_id.get(adolescente_id)
+            registros_adolescente = [item for item in cumprimentos if item["adolescente_id"] == adolescente_id]
+            datas = sorted({item["data_cumprimento"] for item in registros_adolescente}, reverse=True)
+            datas_lancamentos = [
+                {
+                    "data_cumprimento": data_item,
+                    "total_itens": sum(1 for item in registros_adolescente if item["data_cumprimento"] == data_item),
+                }
+                for data_item in datas
+            ]
+            if data_param:
+                lancamentos_da_data = [
+                    item for item in registros_adolescente if item["data_cumprimento"] == data_param
+                ]
+
     return render_template(
         "cumprimentos/lista.html",
-        cumprimentos=cumprimentos,
-        adolescentes=adolescentes,
-        atividades=atividades,
+        adolescentes=adolescentes_resumo,
+        adolescente_selecionado=adolescente_selecionado,
+        datas_lancamentos=datas_lancamentos,
+        lancamentos_da_data=lancamentos_da_data,
+        filtros={"busca": busca, "adolescente_id": adolescente_id_param, "data_cumprimento": data_param},
     )
 
 
 @app.route("/cumprimentos/novo", methods=["GET", "POST"])
 @login_obrigatorio
 def novo_cumprimento():
+    presenca_id = Atividade.obter_id_atividade_por_nome("Presença culto")
+    datas_presenca_por_adolescente = (
+        Atividade.mapa_datas_lancadas_por_atividade(presenca_id) if presenca_id else {}
+    )
+
     if request.method == "POST":
         erro = validar_campos_cumprimento_lote(request.form)
         adolescente = verificar_adolescente_do_formulario()
-        presenca_id = Atividade.obter_id_atividade_por_nome("Presença culto")
         if erro:
             flash(erro, "danger")
         elif adolescente is None:
@@ -997,6 +1062,22 @@ def novo_cumprimento():
                     cumprimento=None,
                     adolescentes=adolescentes_disponiveis(),
                     atividades=Atividade.listar_atividades(somente_ativas=True, incluir_apps=False),
+                    presenca_id=presenca_id,
+                    datas_presenca_por_adolescente=datas_presenca_por_adolescente,
+                )
+            if presenca_id and presenca_id in atividade_ids_int and Atividade.existe_cumprimento_no_dia(
+                adolescente["id"],
+                presenca_id,
+                request.form.get("data_cumprimento", ""),
+            ):
+                flash("Esse adolescente já possui presença lançada nessa data. Edite o registro existente.", "danger")
+                return render_template(
+                    "cumprimentos/formulario.html",
+                    cumprimento=None,
+                    adolescentes=adolescentes_disponiveis(),
+                    atividades=Atividade.listar_atividades(somente_ativas=True, incluir_apps=False),
+                    presenca_id=presenca_id,
+                    datas_presenca_por_adolescente=datas_presenca_por_adolescente,
                 )
 
             registros = Atividade.registrar_cumprimentos_em_lote(request.form, atividade_ids, presenca_id=presenca_id)
@@ -1015,6 +1096,8 @@ def novo_cumprimento():
         cumprimento=None,
         adolescentes=adolescentes_disponiveis(),
         atividades=Atividade.listar_atividades(somente_ativas=True, incluir_apps=False),
+        presenca_id=presenca_id,
+        datas_presenca_por_adolescente=datas_presenca_por_adolescente,
     )
 
 
@@ -1028,17 +1111,27 @@ def editar_cumprimento(cumprimento_id):
 
     atividade_apps_id = Atividade.obter_id_atividade_por_nome("APPS")
     incluir_apps = bool(atividade_apps_id and cumprimento["atividade_id"] == atividade_apps_id)
+    presenca_id = Atividade.obter_id_atividade_por_nome("Presença culto")
+    datas_presenca_por_adolescente = (
+        Atividade.mapa_datas_lancadas_por_atividade(presenca_id) if presenca_id else {}
+    )
 
     if request.method == "POST":
         erro = validar_campos_cumprimento(request.form)
         adolescente = verificar_adolescente_do_formulario()
-        presenca_id = Atividade.obter_id_atividade_por_nome("Presença culto")
         if erro:
             flash(erro, "danger")
         elif adolescente is None:
             flash("Você não tem permissão para lançar tarefa para este adolescente.", "danger")
         elif presenca_id and request.form.get("atividade_id", "").isdigit() and int(request.form["atividade_id"]) == presenca_id and not data_permitida_fase1_apps(request.form.get("data_cumprimento")):
             flash("Na 1ª fase do Top Teens, a atividade Presença só pode ser lançada em 15/03/2026, 22/03/2026, 29/03/2026 ou 12/04/2026.", "danger")
+        elif presenca_id and request.form.get("atividade_id", "").isdigit() and int(request.form["atividade_id"]) == presenca_id and Atividade.existe_cumprimento_no_dia(
+            request.form.get("adolescente_id"),
+            presenca_id,
+            request.form.get("data_cumprimento", ""),
+            excluir_id=cumprimento_id,
+        ):
+            flash("Esse adolescente já possui presença lançada nessa data. Edite o registro existente.", "danger")
         else:
             Atividade.atualizar_cumprimento(cumprimento_id, request.form, presenca_id=presenca_id)
             registrar_auditoria(
@@ -1055,6 +1148,8 @@ def editar_cumprimento(cumprimento_id):
         cumprimento=cumprimento,
         adolescentes=adolescentes_disponiveis(),
         atividades=Atividade.listar_atividades(somente_ativas=True, incluir_apps=incluir_apps),
+        presenca_id=presenca_id,
+        datas_presenca_por_adolescente=datas_presenca_por_adolescente,
     )
 
 
