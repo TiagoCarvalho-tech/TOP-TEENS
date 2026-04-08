@@ -38,6 +38,12 @@ app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
 app.config["SESSION_COOKIE_SECURE"] = environ.get("TOPTEENS_HTTPS_ONLY", "0") == "1"
 app.config["PERMANENT_SESSION_LIFETIME"] = timedelta(hours=8)
 app.config["MAX_CONTENT_LENGTH"] = 1024 * 1024
+DATAS_FASE1_APPS = {
+    "2026-03-15",
+    "2026-03-22",
+    "2026-03-29",
+    "2026-04-12",
+}
 
 
 def login_obrigatorio(view):
@@ -94,11 +100,10 @@ def obter_lider_ga_usuario():
     return normalizar_texto(session.get("usuario_lider_ga", ""))
 
 
-def data_eh_sabado(valor_data):
-    try:
-        return datetime.strptime(valor_data, "%Y-%m-%d").weekday() == 5
-    except (TypeError, ValueError):
+def data_permitida_fase1_apps(valor_data):
+    if not valor_data:
         return False
+    return valor_data in DATAS_FASE1_APPS
 
 
 def criar_usuario_padrao():
@@ -985,8 +990,8 @@ def novo_cumprimento():
         else:
             atividade_ids = [item for item in request.form.getlist("atividade_ids") if item.strip()]
             atividade_ids_int = {int(item) for item in atividade_ids}
-            if presenca_id and presenca_id in atividade_ids_int and not data_eh_sabado(request.form.get("data_cumprimento")):
-                flash("A atividade Presença só pode ser lançada em sábados.", "danger")
+            if presenca_id and presenca_id in atividade_ids_int and not data_permitida_fase1_apps(request.form.get("data_cumprimento")):
+                flash("Na 1ª fase, a atividade Presença só pode ser lançada em 15/03/2026, 22/03/2026, 29/03/2026 ou 12/04/2026.", "danger")
                 return render_template(
                     "cumprimentos/formulario.html",
                     cumprimento=None,
@@ -1032,8 +1037,8 @@ def editar_cumprimento(cumprimento_id):
             flash(erro, "danger")
         elif adolescente is None:
             flash("Você não tem permissão para lançar tarefa para este adolescente.", "danger")
-        elif presenca_id and request.form.get("atividade_id", "").isdigit() and int(request.form["atividade_id"]) == presenca_id and not data_eh_sabado(request.form.get("data_cumprimento")):
-            flash("A atividade Presença só pode ser lançada em sábados.", "danger")
+        elif presenca_id and request.form.get("atividade_id", "").isdigit() and int(request.form["atividade_id"]) == presenca_id and not data_permitida_fase1_apps(request.form.get("data_cumprimento")):
+            flash("Na 1ª fase, a atividade Presença só pode ser lançada em 15/03/2026, 22/03/2026, 29/03/2026 ou 12/04/2026.", "danger")
         else:
             Atividade.atualizar_cumprimento(cumprimento_id, request.form, presenca_id=presenca_id)
             registrar_auditoria(

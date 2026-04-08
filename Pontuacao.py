@@ -43,6 +43,7 @@ def ranking_geral():
                     ) AS posicao
                 FROM cumprimentos_tarefas ct
                 JOIN atividade_presenca ap ON ap.id = ct.atividade_id
+                WHERE ct.data_cumprimento IN ('2026-03-15', '2026-03-22', '2026-03-29', '2026-04-12')
             ),
             presencas_recentes AS (
                 SELECT *
