@@ -132,36 +132,43 @@ def criar_usuario_padrao():
 
 def popular_atividades_iniciais():
     atividades_padrao = [
-        ("Presença", 10, "Registrar presença no encontro"),
-        ("Meditação", 20, "Cumprir a meditação proposta"),
+        ("Presença culto", 10, "Registrar presença no culto"),
+        ("Meditação e versículo", 10, "Cumprir meditação e versículo da fase"),
         ("Bíblia e anotação", 10, "Leitura bíblica com anotação"),
         ("Visitante", 1, "Levar um visitante"),
-        ("Apps", 40, "Cumprimento de atividade via aplicativo"),
-        ("Desafio", 40, "Concluir o desafio oficial"),
+        ("APPS", 10, "Pontuação de fase do APPS com regra de presença"),
+        ("Não cumpriu nenhuma atividade", 0, "Lançamento sem pontuação"),
     ]
-    atividades_legadas = [
-        "Trazer Bíblia",
-        "Decorar Versículo",
-        "Trazer Visitante",
-        "Participar do Desafio",
-    ]
+    aliases = {
+        "Presença": "Presença culto",
+        "Meditação": "Meditação e versículo",
+        "Apps": "APPS",
+    }
 
     with get_connection() as connection:
+        # Migração simples de nomes antigos para os novos, sem mexer nos pontos já ajustados manualmente.
+        for nome_antigo, nome_novo in aliases.items():
+            antigo = connection.execute(
+                "SELECT id FROM atividades WHERE lower(nome) = lower(%s)",
+                (nome_antigo,),
+            ).fetchone()
+            novo = connection.execute(
+                "SELECT id FROM atividades WHERE lower(nome) = lower(%s)",
+                (nome_novo,),
+            ).fetchone()
+            if antigo and not novo:
+                connection.execute(
+                    "UPDATE atividades SET nome = %s WHERE id = %s",
+                    (nome_novo, antigo["id"]),
+                )
+
+        # Só cria atividades que não existem. Não sobrescreve alterações feitas pelo usuário.
         for nome, pontos, descricao in atividades_padrao:
             atividade = connection.execute(
                 "SELECT id FROM atividades WHERE lower(nome) = lower(%s)",
                 (nome,),
             ).fetchone()
-            if atividade:
-                connection.execute(
-                    """
-                    UPDATE atividades
-                    SET pontos = %s, descricao = %s, ativo = 1
-                    WHERE id = %s
-                    """,
-                    (pontos, descricao, atividade["id"]),
-                )
-            else:
+            if atividade is None:
                 connection.execute(
                     """
                     INSERT INTO atividades (nome, pontos, descricao, ativo)
@@ -169,16 +176,6 @@ def popular_atividades_iniciais():
                     """,
                     (nome, pontos, descricao),
                 )
-
-        for nome_legado in atividades_legadas:
-            connection.execute(
-                """
-                UPDATE atividades
-                SET ativo = 0
-                WHERE nome = %s
-                """,
-                (nome_legado,),
-            )
 
 
 def validar_password_forte(senha):
@@ -298,6 +295,10 @@ def validar_campos_cumprimento_lote(formulario):
         return "Selecione um status válido para o cumprimento."
     if any(not atividade_id.isdigit() for atividade_id in atividade_ids):
         return "Há uma atividade inválida na seleção."
+
+    atividade_nao_cumpriu_id = Atividade.obter_id_atividade_por_nome("Não cumpriu nenhuma atividade")
+    if atividade_nao_cumpriu_id and str(atividade_nao_cumpriu_id) in atividade_ids and len(atividade_ids) > 1:
+        return "Se marcar 'Não cumpriu nenhuma atividade', selecione somente essa atividade."
     return None
 
 
@@ -914,7 +915,7 @@ def detalhe_adolescente(adolescente_id):
 @app.route("/atividades")
 @login_obrigatorio
 def listar_atividades():
-    atividades = Atividade.listar_atividades()
+    atividades = Atividade.listar_atividades(somente_ativas=True)
     return render_template("atividades/lista.html", atividades=atividades)
 
 
@@ -981,7 +982,7 @@ def novo_cumprimento():
     if request.method == "POST":
         erro = validar_campos_cumprimento_lote(request.form)
         adolescente = verificar_adolescente_do_formulario()
-        presenca_id = Atividade.obter_id_atividade_por_nome("Presença")
+        presenca_id = Atividade.obter_id_atividade_por_nome("Presença culto")
         if erro:
             flash(erro, "danger")
         elif adolescente is None:
@@ -990,7 +991,7 @@ def novo_cumprimento():
             atividade_ids = [item for item in request.form.getlist("atividade_ids") if item.strip()]
             atividade_ids_int = {int(item) for item in atividade_ids}
             if presenca_id and presenca_id in atividade_ids_int and not data_permitida_fase1_apps(request.form.get("data_cumprimento")):
-                flash("Na 1ª fase, a atividade Presença só pode ser lançada em 15/03/2026, 22/03/2026, 29/03/2026 ou 12/04/2026.", "danger")
+                flash("Na 1ª fase do Top Teens, a atividade Presença só pode ser lançada em 15/03/2026, 22/03/2026, 29/03/2026 ou 12/04/2026.", "danger")
                 return render_template(
                     "cumprimentos/formulario.html",
                     cumprimento=None,
@@ -1025,19 +1026,19 @@ def editar_cumprimento(cumprimento_id):
         flash("Registro de cumprimento não encontrado ou sem permissão de acesso.", "danger")
         return redirect(url_for("listar_cumprimentos"))
 
-    atividade_apps_id = Atividade.obter_id_atividade_por_nome("Apps")
+    atividade_apps_id = Atividade.obter_id_atividade_por_nome("APPS")
     incluir_apps = bool(atividade_apps_id and cumprimento["atividade_id"] == atividade_apps_id)
 
     if request.method == "POST":
         erro = validar_campos_cumprimento(request.form)
         adolescente = verificar_adolescente_do_formulario()
-        presenca_id = Atividade.obter_id_atividade_por_nome("Presença")
+        presenca_id = Atividade.obter_id_atividade_por_nome("Presença culto")
         if erro:
             flash(erro, "danger")
         elif adolescente is None:
             flash("Você não tem permissão para lançar tarefa para este adolescente.", "danger")
         elif presenca_id and request.form.get("atividade_id", "").isdigit() and int(request.form["atividade_id"]) == presenca_id and not data_permitida_fase1_apps(request.form.get("data_cumprimento")):
-            flash("Na 1ª fase, a atividade Presença só pode ser lançada em 15/03/2026, 22/03/2026, 29/03/2026 ou 12/04/2026.", "danger")
+            flash("Na 1ª fase do Top Teens, a atividade Presença só pode ser lançada em 15/03/2026, 22/03/2026, 29/03/2026 ou 12/04/2026.", "danger")
         else:
             Atividade.atualizar_cumprimento(cumprimento_id, request.form, presenca_id=presenca_id)
             registrar_auditoria(

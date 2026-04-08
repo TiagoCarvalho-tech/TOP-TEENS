@@ -39,7 +39,7 @@
         <label>
             Data
             <input type="date" name="data_cumprimento" value="{{ cumprimento.data_cumprimento if cumprimento else today }}" required>
-            <small class="field-help">Para a 1ª fase do APPS, a atividade Presença só pode ser lançada nas datas: 15/03/2026, 22/03/2026, 29/03/2026 e 12/04/2026.</small>
+            <small class="field-help">Na 1ª fase do Top Teens, a atividade Presença só pode ser lançada nas datas: 15/03/2026, 22/03/2026, 29/03/2026 e 12/04/2026.</small>
         </label>
         <label>
             Cumpriu?
@@ -81,10 +81,10 @@
         <label>
             Data
             <input type="date" name="data_cumprimento" value="{{ today }}" required>
-            <small class="field-help">Para a 1ª fase do APPS, a atividade Presença só pode ser lançada nas datas: 15/03/2026, 22/03/2026, 29/03/2026 e 12/04/2026.</small>
+            <small class="field-help">Na 1ª fase do Top Teens, a atividade Presença só pode ser lançada nas datas: 15/03/2026, 22/03/2026, 29/03/2026 e 12/04/2026.</small>
         </label>
         <label>
-            Status aplicado ao lote
+            Adolescente estava presente
             <select name="cumpriu" required>
                 <option value="1" selected>Sim</option>
                 <option value="0">Não</option>
@@ -108,7 +108,7 @@
                 </label>
                 {% endfor %}
             </div>
-            <small class="field-help">A atividade Apps não é lançada manualmente: ela vale 40 pontos automaticamente quando o adolescente cumpre a regra das 4 presenças de sábado.</small>
+            <small class="field-help">Selecione as atividades que deseja lançar para o adolescente nesta data.</small>
         </div>
         <label class="full-span">
             Observações

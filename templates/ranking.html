@@ -20,7 +20,7 @@
                 <th>Gênero</th>
                 <th>GA</th>
                 <th>Pontos em atividades</th>
-                <th>Pontos Apps</th>
+                <th>Pontos APPS (fase)</th>
                 <th>Total</th>
             </tr>
         </thead>
@@ -32,7 +32,7 @@
                 <td>{{ "Masculino" if item.sexo == "M" else "Feminino" }}</td>
                 <td>{{ item.lider_ga }}</td>
                 <td>{{ item.pontos_tarefas }}</td>
-                <td>{{ item.pontos_apps }}</td>
+                <td>{{ item.pontos_apps_fase }}</td>
                 <td><strong>{{ item.total_pontos }}</strong></td>
             </tr>
             {% else %}

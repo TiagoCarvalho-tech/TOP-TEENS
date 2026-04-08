@@ -8,62 +8,58 @@ def ranking_geral():
             WITH atividade_apps AS (
                 SELECT id, pontos
                 FROM atividades
-                WHERE lower(nome) = lower('Apps')
+                WHERE lower(nome) = lower('APPS')
                 LIMIT 1
             ),
             atividade_presenca AS (
-                SELECT id
+                SELECT id, pontos
                 FROM atividades
-                WHERE lower(nome) = lower('Presença')
+                WHERE lower(nome) = lower('Presença culto')
                 LIMIT 1
             ),
             pontos_tarefas AS (
                 SELECT
                     ct.adolescente_id,
-                    SUM(
-                        CASE
-                            WHEN ct.cumpriu = 1
-                                 AND ct.atividade_id <> COALESCE((SELECT id FROM atividade_apps), -1)
-                            THEN a.pontos
-                            ELSE 0
-                        END
-                    ) AS total_tarefas
+                    SUM(CASE WHEN ct.cumpriu = 1 THEN a.pontos ELSE 0 END) AS total_tarefas
                 FROM cumprimentos_tarefas ct
                 JOIN atividades a ON a.id = ct.atividade_id
+                WHERE a.ativo = 1
+                  AND ct.atividade_id <> COALESCE((SELECT id FROM atividade_apps), -1)
                 GROUP BY ct.adolescente_id
             ),
-            presencas_ordenadas AS (
+            presenca_por_data AS (
                 SELECT
                     ct.adolescente_id,
+                    ct.data_cumprimento,
                     ct.cumpriu,
                     ct.falta_justificada,
                     ROW_NUMBER() OVER (
-                        PARTITION BY ct.adolescente_id
-                        ORDER BY ct.data_cumprimento DESC, ct.id DESC
-                    ) AS posicao
+                        PARTITION BY ct.adolescente_id, ct.data_cumprimento
+                        ORDER BY ct.id DESC
+                    ) AS pos
                 FROM cumprimentos_tarefas ct
                 JOIN atividade_presenca ap ON ap.id = ct.atividade_id
                 WHERE ct.data_cumprimento IN ('2026-03-15', '2026-03-22', '2026-03-29', '2026-04-12')
             ),
-            presencas_recentes AS (
-                SELECT *
-                FROM presencas_ordenadas
-                WHERE posicao <= 4
-            ),
-            pontos_apps AS (
+            presencas_fase AS (
                 SELECT
-                    pr.adolescente_id,
+                    adolescente_id,
+                    COUNT(*) AS total_dias_lancados,
+                    SUM(CASE WHEN cumpriu = 1 OR falta_justificada = 1 THEN 1 ELSE 0 END) AS total_dias_validos
+                FROM presenca_por_data
+                WHERE pos = 1
+                GROUP BY adolescente_id
+            ),
+            pontos_presenca_fase AS (
+                SELECT
+                    pf.adolescente_id,
                     CASE
-                        WHEN COUNT(*) = 4 AND SUM(CASE WHEN pr.cumpriu = 1 THEN 1 ELSE 0 END) = 4
-                            THEN COALESCE((SELECT pontos FROM atividade_apps), 40)
-                        WHEN COUNT(*) = 4
-                             AND SUM(CASE WHEN pr.cumpriu = 1 THEN 1 ELSE 0 END) = 3
-                             AND SUM(CASE WHEN pr.cumpriu = 0 AND pr.falta_justificada = 1 THEN 1 ELSE 0 END) >= 1
-                            THEN COALESCE((SELECT pontos FROM atividade_apps), 40)
+                        WHEN pf.total_dias_lancados = 4
+                             AND pf.total_dias_validos = 4
+                        THEN COALESCE((SELECT pontos FROM atividade_apps), 10)
                         ELSE 0
                     END AS total_apps
-                FROM presencas_recentes pr
-                GROUP BY pr.adolescente_id
+                FROM presencas_fase pf
             )
             SELECT
                 ad.id,
@@ -72,11 +68,11 @@ def ranking_geral():
                 ad.sexo,
                 ad.lider_ga,
                 COALESCE(pt.total_tarefas, 0) AS pontos_tarefas,
-                COALESCE(pa.total_apps, 0) AS pontos_apps,
-                COALESCE(pt.total_tarefas, 0) + COALESCE(pa.total_apps, 0) AS total_pontos
+                COALESCE(pp.total_apps, 0) AS pontos_apps_fase,
+                COALESCE(pt.total_tarefas, 0) + COALESCE(pp.total_apps, 0) AS total_pontos
             FROM adolescentes ad
             LEFT JOIN pontos_tarefas pt ON pt.adolescente_id = ad.id
-            LEFT JOIN pontos_apps pa ON pa.adolescente_id = ad.id
+            LEFT JOIN pontos_presenca_fase pp ON pp.adolescente_id = ad.id
             ORDER BY total_pontos DESC, ad.nome
             """
         ).fetchall()
