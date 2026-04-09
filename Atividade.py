@@ -164,12 +164,13 @@ def obter_cumprimento(cumprimento_id):
         ).fetchone()
 
 
-def registrar_cumprimento(dados):
-    presenca_id = dados.get("presenca_id")
+def registrar_cumprimento(dados, presenca_id=None, apps_id=None):
     atividade_id = int(dados["atividade_id"])
     cumpriu = int(dados["cumpriu"])
     falta_justificada = 0
-    if presenca_id is not None and atividade_id == int(presenca_id) and cumpriu == 0:
+    eh_presenca = presenca_id is not None and atividade_id == int(presenca_id)
+    eh_apps = apps_id is not None and atividade_id == int(apps_id)
+    if (eh_presenca or eh_apps) and cumpriu == 0:
         falta_justificada = int(str(dados.get("falta_justificada", "0")).strip() == "1")
 
     with get_connection() as connection:
@@ -223,11 +224,13 @@ def registrar_cumprimentos_em_lote(dados, atividade_ids, presenca_id=None):
     return registros
 
 
-def atualizar_cumprimento(cumprimento_id, dados, presenca_id=None):
+def atualizar_cumprimento(cumprimento_id, dados, presenca_id=None, apps_id=None):
     atividade_id = int(dados["atividade_id"])
     cumpriu = int(dados["cumpriu"])
     falta_justificada = 0
-    if presenca_id is not None and atividade_id == int(presenca_id) and cumpriu == 0:
+    eh_presenca = presenca_id is not None and atividade_id == int(presenca_id)
+    eh_apps = apps_id is not None and atividade_id == int(apps_id)
+    if (eh_presenca or eh_apps) and cumpriu == 0:
         falta_justificada = int(str(dados.get("falta_justificada", "0")).strip() == "1")
 
     with get_connection() as connection:

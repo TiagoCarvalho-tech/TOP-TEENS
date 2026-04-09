@@ -13,6 +13,9 @@
     const datasAppsFase = JSON.parse(form.dataset.datasAppsFase || "[]");
     const appsWrapper = document.getElementById("apps-fase-data-wrapper");
     const appsSelect = document.getElementById("apps-fase-data-select");
+    const appsStatusWrapper = document.getElementById("apps-status-wrapper");
+    const appsCumpriuSelect = document.getElementById("apps-cumpriu-select");
+    const appsJustificativaWrapper = document.getElementById("apps-justificativa-wrapper");
 
     if (!adolescenteSelect || !dataInput || !aviso) return;
 
@@ -64,11 +67,19 @@
 
         if (!atividadeSelecionada(appsId)) {
             appsWrapper.style.display = "none";
+            if (appsStatusWrapper) appsStatusWrapper.style.display = "none";
+            if (appsJustificativaWrapper) appsJustificativaWrapper.style.display = "none";
             appsSelect.value = "";
             return;
         }
 
         appsWrapper.style.display = "grid";
+        if (appsStatusWrapper) appsStatusWrapper.style.display = "grid";
+        if (appsCumpriuSelect && appsCumpriuSelect.value === "0") {
+            if (appsJustificativaWrapper) appsJustificativaWrapper.style.display = "grid";
+        } else if (appsJustificativaWrapper) {
+            appsJustificativaWrapper.style.display = "none";
+        }
         if (datasAppsFase.includes(dataInput.value)) {
             appsSelect.value = dataInput.value;
         } else if (appsSelect.value) {
@@ -143,6 +154,13 @@
                 dataInput.value = appsSelect.value;
             }
             dataInput.setCustomValidity("");
+        });
+    }
+
+    if (appsCumpriuSelect) {
+        appsCumpriuSelect.addEventListener("change", function () {
+            if (!appsJustificativaWrapper) return;
+            appsJustificativaWrapper.style.display = appsCumpriuSelect.value === "0" ? "grid" : "none";
         });
     }
 

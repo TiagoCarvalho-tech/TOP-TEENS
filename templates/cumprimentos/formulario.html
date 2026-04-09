@@ -90,22 +90,8 @@
         <label>
             Data
             <input id="novo-cumprimento-data" type="date" name="data_cumprimento" value="{{ today }}" required>
-            <small class="field-help">A data escolhida é aplicada às atividades selecionadas no lançamento.</small>
+            <small class="field-help">A data escolhida é aplicada às atividades selecionadas, exceto APPS.</small>
             <small id="datas-presenca-bloqueadas" class="field-help"></small>
-        </label>
-        <label>
-            Adolescente estava presente
-            <select name="cumpriu" required>
-                <option value="1" selected>Sim</option>
-                <option value="0">Não</option>
-            </select>
-        </label>
-        <label class="full-span">
-            <span class="checkbox-inline">
-                <input type="checkbox" name="falta_justificada" value="1">
-                Marcar falta justificada
-            </span>
-            <small class="field-help">Essa marcação será aplicada apenas para Presença com status Não.</small>
         </label>
         <div class="full-span">
             <span class="field-title">Atividades do mesmo lançamento</span>
@@ -129,6 +115,20 @@
                 {% endfor %}
             </select>
             <small class="field-help">Ao marcar APPS, selecione uma dessas datas: 2026-03-15, 2026-03-22, 2026-03-29, 2026-04-12. Datas já lançadas ficam bloqueadas para novo lançamento.</small>
+        </label>
+        <label id="apps-status-wrapper" class="full-span" style="display: none;">
+            Adolescente estava presente no APPS?
+            <select id="apps-cumpriu-select" name="apps_cumpriu">
+                <option value="1" selected>Sim</option>
+                <option value="0">Não</option>
+            </select>
+        </label>
+        <label id="apps-justificativa-wrapper" class="full-span" style="display: none;">
+            <span class="checkbox-inline">
+                <input type="checkbox" name="apps_falta_justificada" value="1">
+                Falta justificada no APPS
+            </span>
+            <small class="field-help">Use quando marcar APPS com status Não.</small>
         </label>
         <label class="full-span">
             Observações

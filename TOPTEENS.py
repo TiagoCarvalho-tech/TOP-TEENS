@@ -304,16 +304,30 @@ def validar_campos_cumprimento(formulario):
 
 
 def validar_campos_cumprimento_lote(formulario):
-    obrigatorios = ["adolescente_id", "data_cumprimento", "cumpriu"]
-    if any(not formulario.get(campo, "").strip() for campo in obrigatorios):
-        return "Preencha adolescente, data e status do cumprimento."
+    if not formulario.get("adolescente_id", "").strip():
+        return "Selecione o adolescente."
     atividade_ids = [item for item in request.form.getlist("atividade_ids") if item.strip()]
     if not atividade_ids:
         return "Selecione pelo menos uma atividade para lançar."
-    if formulario.get("cumpriu") not in {"0", "1"}:
-        return "Selecione um status válido para o cumprimento."
     if any(not atividade_id.isdigit() for atividade_id in atividade_ids):
         return "Há uma atividade inválida na seleção."
+
+    apps_id = Atividade.obter_id_atividade_por_nome("APPS")
+    atividade_ids_int = {int(item) for item in atividade_ids}
+    apps_selecionado = bool(apps_id and apps_id in atividade_ids_int)
+    if apps_selecionado:
+        if not formulario.get("apps_data_cumprimento", "").strip():
+            return "Selecione a data do APPS."
+        if formulario.get("apps_cumpriu") not in {"0", "1"}:
+            return "Selecione se o adolescente estava presente no APPS."
+        if not data_permitida_fase1_apps(formulario.get("apps_data_cumprimento")):
+            return "A data do APPS deve ser uma das datas da fase 1."
+
+    tem_outras_atividades = any(
+        atividade_id != apps_id for atividade_id in atividade_ids_int
+    )
+    if tem_outras_atividades and not formulario.get("data_cumprimento", "").strip():
+        return "Informe a data para as demais atividades selecionadas."
 
     atividade_nao_cumpriu_id = Atividade.obter_id_atividade_por_nome("Não cumpriu nenhuma atividade")
     if atividade_nao_cumpriu_id and str(atividade_nao_cumpriu_id) in atividade_ids and len(atividade_ids) > 1:
@@ -1066,23 +1080,11 @@ def novo_cumprimento():
         else:
             atividade_ids = [item for item in request.form.getlist("atividade_ids") if item.strip()]
             atividade_ids_int = {int(item) for item in atividade_ids}
-            if apps_id and apps_id in atividade_ids_int and not data_permitida_fase1_apps(request.form.get("data_cumprimento")):
-                flash("Na 1ª fase do Top Teens, a atividade APPS só pode ser lançada em 15/03/2026, 22/03/2026, 29/03/2026 ou 12/04/2026.", "danger")
-                return render_template(
-                    "cumprimentos/formulario.html",
-                    cumprimento=None,
-                    adolescentes=adolescentes_disponiveis(),
-                    atividades=Atividade.listar_atividades(somente_ativas=True),
-                    presenca_id=presenca_id,
-                    apps_id=apps_id,
-                    datas_apps_fase=sorted(DATAS_FASE1_APPS),
-                    datas_presenca_por_adolescente=datas_presenca_por_adolescente,
-                    datas_apps_por_adolescente=datas_apps_por_adolescente,
-                )
+            apps_data = request.form.get("apps_data_cumprimento", "")
             if apps_id and apps_id in atividade_ids_int and Atividade.existe_cumprimento_no_dia(
                 adolescente["id"],
                 apps_id,
-                request.form.get("data_cumprimento", ""),
+                apps_data,
             ):
                 flash("Esse adolescente já possui APPS lançado nessa data. Use a edição no histórico de cumprimentos.", "danger")
                 return render_template(
@@ -1114,7 +1116,30 @@ def novo_cumprimento():
                     datas_apps_por_adolescente=datas_apps_por_adolescente,
                 )
 
-            registros = Atividade.registrar_cumprimentos_em_lote(request.form, atividade_ids, presenca_id=presenca_id)
+            atividade_nao_cumpriu_id = Atividade.obter_id_atividade_por_nome("Não cumpriu nenhuma atividade")
+            registros = []
+            for atividade_id in atividade_ids_int:
+                dados_item = {
+                    "adolescente_id": adolescente["id"],
+                    "atividade_id": atividade_id,
+                    "observacoes": request.form.get("observacoes", ""),
+                }
+
+                if apps_id and atividade_id == apps_id:
+                    dados_item["data_cumprimento"] = apps_data
+                    dados_item["cumpriu"] = request.form.get("apps_cumpriu", "1")
+                    dados_item["falta_justificada"] = request.form.get("apps_falta_justificada", "0")
+                else:
+                    dados_item["data_cumprimento"] = request.form.get("data_cumprimento", "")
+                    dados_item["cumpriu"] = "0" if atividade_nao_cumpriu_id and atividade_id == atividade_nao_cumpriu_id else "1"
+                    dados_item["falta_justificada"] = "0"
+
+                registro = Atividade.registrar_cumprimento(
+                    dados_item,
+                    presenca_id=presenca_id,
+                    apps_id=apps_id,
+                )
+                registros.append(registro)
             for registro in registros:
                 registrar_auditoria(
                     "lancamento_cumprimento",
@@ -1180,7 +1205,12 @@ def editar_cumprimento(cumprimento_id):
         ):
             flash("Esse adolescente já possui presença lançada nessa data. Edite o registro existente.", "danger")
         else:
-            Atividade.atualizar_cumprimento(cumprimento_id, request.form, presenca_id=presenca_id)
+            Atividade.atualizar_cumprimento(
+                cumprimento_id,
+                request.form,
+                presenca_id=presenca_id,
+                apps_id=atividade_apps_id,
+            )
             registrar_auditoria(
                 "edicao_cumprimento",
                 "cumprimento",
