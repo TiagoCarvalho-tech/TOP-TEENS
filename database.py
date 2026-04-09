@@ -107,6 +107,12 @@ def init_db():
                 """
             )
             cursor.execute(
+                "ALTER TABLE adolescentes ADD COLUMN IF NOT EXISTS lider_id INTEGER REFERENCES usuarios(id) ON DELETE SET NULL"
+            )
+            cursor.execute(
+                "ALTER TABLE adolescentes ADD COLUMN IF NOT EXISTS foto_path TEXT"
+            )
+            cursor.execute(
                 """
                 CREATE INDEX IF NOT EXISTS idx_adolescentes_lider_id
                 ON adolescentes(lider_id)
@@ -151,12 +157,6 @@ def init_db():
             )
             cursor.execute(
                 "ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS lider_ga TEXT"
-            )
-            cursor.execute(
-                "ALTER TABLE adolescentes ADD COLUMN IF NOT EXISTS lider_id INTEGER REFERENCES usuarios(id) ON DELETE SET NULL"
-            )
-            cursor.execute(
-                "ALTER TABLE adolescentes ADD COLUMN IF NOT EXISTS foto_path TEXT"
             )
             cursor.execute(
                 "ALTER TABLE cumprimentos_tarefas ADD COLUMN IF NOT EXISTS falta_justificada INTEGER NOT NULL DEFAULT 0"
