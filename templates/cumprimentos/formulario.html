@@ -12,9 +12,20 @@
     {% if cumprimento %}
     <form method="post" class="form-grid two-cols">
         <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
+        <label class="full-span">
+            Buscar adolescente
+            <input
+                type="text"
+                id="adolescente-busca-editar"
+                data-adolescente-busca-for="adolescente-select-editar"
+                placeholder="Digite parte do nome para filtrar a lista"
+                autocomplete="off"
+            >
+            <small class="field-help">A lista abaixo é filtrada conforme você digita.</small>
+        </label>
         <label>
             Adolescente
-            <select name="adolescente_id" required>
+            <select id="adolescente-select-editar" name="adolescente_id" required>
                 <option value="">Selecione</option>
                 {% set adolescente_id = cumprimento.adolescente_id if cumprimento else '' %}
                 {% for adolescente in adolescentes %}
@@ -76,9 +87,20 @@
         data-datas-presenca='{{ datas_presenca_por_adolescente | tojson }}'
     >
         <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
+        <label class="full-span">
+            Buscar adolescente
+            <input
+                type="text"
+                id="adolescente-busca-novo"
+                data-adolescente-busca-for="adolescente-select-novo"
+                placeholder="Digite parte do nome para filtrar a lista"
+                autocomplete="off"
+            >
+            <small class="field-help">A lista abaixo é filtrada conforme você digita.</small>
+        </label>
         <label>
             Adolescente
-            <select name="adolescente_id" required>
+            <select id="adolescente-select-novo" name="adolescente_id" required>
                 <option value="">Selecione</option>
                 {% for adolescente in adolescentes %}
                 <option value="{{ adolescente.id }}">
@@ -143,7 +165,5 @@
 {% endblock %}
 
 {% block extra_scripts %}
-{% if not cumprimento %}
 <script src="{{ url_for('static', filename='cumprimentos.js') }}" defer></script>
-{% endif %}
 {% endblock %}

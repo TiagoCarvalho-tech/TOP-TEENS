@@ -1,4 +1,60 @@
 (function () {
+    function initBuscaAdolescente() {
+        const camposBusca = Array.from(document.querySelectorAll("[data-adolescente-busca-for]"));
+        camposBusca.forEach((campoBusca) => {
+            const selectId = campoBusca.getAttribute("data-adolescente-busca-for");
+            const select = document.getElementById(selectId);
+            if (!select) return;
+
+            const opcoesOriginais = Array.from(select.options).map((opcao) => ({
+                value: opcao.value,
+                text: opcao.text,
+                selected: opcao.selected,
+            }));
+
+            const opcaoPlaceholder = opcoesOriginais.find((opcao) => opcao.value === "");
+            const opcoesDados = opcoesOriginais.filter((opcao) => opcao.value !== "");
+
+            function renderizar(term) {
+                const termo = (term || "").trim().toLowerCase();
+                const valorAtual = select.value;
+                const filtradas = !termo
+                    ? opcoesDados
+                    : opcoesDados.filter((opcao) => opcao.text.toLowerCase().includes(termo));
+
+                select.innerHTML = "";
+                const placeholder = document.createElement("option");
+                placeholder.value = "";
+                placeholder.textContent = opcaoPlaceholder ? opcaoPlaceholder.text : "Selecione";
+                select.appendChild(placeholder);
+
+                filtradas.forEach((opcao) => {
+                    const node = document.createElement("option");
+                    node.value = opcao.value;
+                    node.textContent = opcao.text;
+                    select.appendChild(node);
+                });
+
+                if (filtradas.some((opcao) => opcao.value === valorAtual)) {
+                    select.value = valorAtual;
+                } else if (!termo && opcoesOriginais.some((opcao) => opcao.selected)) {
+                    const selecionadaInicial = opcoesOriginais.find((opcao) => opcao.selected);
+                    if (selecionadaInicial && selecionadaInicial.value) {
+                        select.value = selecionadaInicial.value;
+                    }
+                } else {
+                    select.value = "";
+                }
+            }
+
+            campoBusca.addEventListener("input", function () {
+                renderizar(campoBusca.value);
+            });
+        });
+    }
+
+    initBuscaAdolescente();
+
     const form = document.getElementById("novo-cumprimento-form");
     if (!form) return;
 
