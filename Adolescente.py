@@ -30,7 +30,7 @@ def normalizar_contato(contato):
     return numeros
 
 
-def listar_adolescentes(busca="", lider_ga="", sexo=""):
+def listar_adolescentes(busca="", lider_ga="", sexo="", lider_id=None):
     filtros = []
     parametros = []
 
@@ -39,7 +39,10 @@ def listar_adolescentes(busca="", lider_ga="", sexo=""):
         termo = f"%{busca.strip()}%"
         parametros.extend([termo, termo])
 
-    if lider_ga:
+    if lider_id is not None:
+        filtros.append("lider_id = %s")
+        parametros.append(int(lider_id))
+    elif lider_ga:
         filtros.append("lider_ga = %s")
         parametros.append(lider_ga)
 
@@ -89,12 +92,14 @@ def cadastrar_adolescente(dados):
         adolescente = connection.execute(
             """
             INSERT INTO adolescentes (
-                matricula, nome, nascimento, contato, sexo, pai, mae, lider_ga
-            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                lider_id, matricula, foto_path, nome, nascimento, contato, sexo, pai, mae, lider_ga
+            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             RETURNING id, matricula
             """,
             (
+                int(dados["lider_id"]) if str(dados.get("lider_id", "")).isdigit() else None,
                 matricula,
+                dados.get("foto_path", "").strip(),
                 normalizar_nome(dados["nome"]),
                 dados["nascimento"],
                 normalizar_contato(dados.get("contato", "")),
@@ -112,10 +117,12 @@ def atualizar_adolescente(adolescente_id, dados):
         connection.execute(
             """
             UPDATE adolescentes
-            SET nome = %s, nascimento = %s, contato = %s, sexo = %s, pai = %s, mae = %s, lider_ga = %s
+            SET lider_id = %s, foto_path = %s, nome = %s, nascimento = %s, contato = %s, sexo = %s, pai = %s, mae = %s, lider_ga = %s
             WHERE id = %s
             """,
             (
+                int(dados["lider_id"]) if str(dados.get("lider_id", "")).isdigit() else None,
+                dados.get("foto_path", "").strip(),
                 normalizar_nome(dados["nome"]),
                 dados["nascimento"],
                 normalizar_contato(dados.get("contato", "")),

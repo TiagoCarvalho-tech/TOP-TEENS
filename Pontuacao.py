@@ -1,158 +1,180 @@
 from database import get_connection
 
 
-def ranking_geral():
+FASE1_SEMANAS = [
+    "2026-03-15",
+    "2026-03-22",
+    "2026-03-29",
+    "2026-04-12",
+]
+
+PONTOS_FIXOS = {
+    "P": 10,
+    "MV": 20,
+    "AB": 10,
+    "V": 1,
+    "APPS": 40,
+}
+
+SINONIMOS_ATIVIDADE = {
+    "P": {"presença", "presenca", "presença culto"},
+    "MV": {"meditação e versículo", "meditacao e versiculo", "meditação e versiculo", "meditação"},
+    "AB": {"anotação e bíblia", "anotacao e biblia", "bíblia e anotação", "biblia e anotacao"},
+    "V": {"visitante"},
+    "APPS": {"apps"},
+}
+
+
+def _normalizar_nome(nome):
+    return (nome or "").strip().lower()
+
+
+def _carregar_mapa_ids_atividades():
+    mapa = {"P": set(), "MV": set(), "AB": set(), "V": set(), "APPS": set()}
     with get_connection() as connection:
-        return connection.execute(
+        atividades = connection.execute(
             """
-            WITH atividade_apps AS (
-                SELECT id, pontos
-                FROM atividades
-                WHERE lower(nome) = lower('APPS')
-                LIMIT 1
-            ),
-            pontos_tarefas AS (
-                SELECT
-                    ct.adolescente_id,
-                    SUM(CASE WHEN ct.cumpriu = 1 THEN a.pontos ELSE 0 END) AS total_tarefas
-                FROM cumprimentos_tarefas ct
-                JOIN atividades a ON a.id = ct.atividade_id
-                WHERE a.ativo = 1
-                  AND ct.atividade_id <> COALESCE((SELECT id FROM atividade_apps), -1)
-                GROUP BY ct.adolescente_id
-            ),
-            apps_por_data AS (
-                SELECT
-                    ct.adolescente_id,
-                    ct.data_cumprimento,
-                    ct.cumpriu,
-                    ct.falta_justificada,
-                    ROW_NUMBER() OVER (
-                        PARTITION BY ct.adolescente_id, ct.data_cumprimento
-                        ORDER BY ct.id DESC
-                    ) AS pos
-                FROM cumprimentos_tarefas ct
-                JOIN atividade_apps aa ON aa.id = ct.atividade_id
-                WHERE ct.data_cumprimento IN ('2026-03-15', '2026-03-22', '2026-03-29', '2026-04-12')
-            ),
-            apps_fase AS (
-                SELECT
-                    adolescente_id,
-                    COUNT(*) AS total_dias_lancados,
-                    SUM(CASE WHEN cumpriu = 1 THEN 1 ELSE 0 END) AS total_presentes,
-                    SUM(CASE WHEN cumpriu = 0 THEN 1 ELSE 0 END) AS total_faltas,
-                    SUM(CASE WHEN cumpriu = 0 AND falta_justificada = 1 THEN 1 ELSE 0 END) AS total_faltas_justificadas,
-                    SUM(CASE WHEN cumpriu = 0 AND falta_justificada = 0 THEN 1 ELSE 0 END) AS total_faltas_nao_justificadas
-                FROM apps_por_data
-                WHERE pos = 1
-                GROUP BY adolescente_id
-            ),
-            pontos_apps_fase AS (
-                SELECT
-                    af.adolescente_id,
-                    CASE
-                        WHEN af.total_dias_lancados = 4
-                             AND af.total_faltas_nao_justificadas = 0
-                             AND af.total_faltas <= 1
-                             AND af.total_faltas_justificadas <= 1
-                        THEN COALESCE((SELECT pontos FROM atividade_apps), 10)
-                        ELSE 0
-                    END AS total_apps
-                FROM apps_fase af
-            )
-            SELECT
-                ad.id,
-                ad.matricula,
-                ad.nome,
-                ad.sexo,
-                ad.lider_ga,
-                COALESCE(pt.total_tarefas, 0) AS pontos_tarefas,
-                COALESCE(pp.total_apps, 0) AS pontos_apps_fase,
-                COALESCE(pt.total_tarefas, 0) + COALESCE(pp.total_apps, 0) AS total_pontos
-            FROM adolescentes ad
-            LEFT JOIN pontos_tarefas pt ON pt.adolescente_id = ad.id
-            LEFT JOIN pontos_apps_fase pp ON pp.adolescente_id = ad.id
-            ORDER BY total_pontos DESC, ad.nome
+            SELECT id, nome
+            FROM atividades
+            WHERE ativo = 1
             """
         ).fetchall()
 
+    for atividade in atividades:
+        nome = _normalizar_nome(atividade["nome"])
+        for chave, sinonimos in SINONIMOS_ATIVIDADE.items():
+            if nome in sinonimos:
+                mapa[chave].add(atividade["id"])
+                break
+    return mapa
 
-def ranking_por_sexo():
-    ranking = ranking_geral()
-    resultado = {"M": [], "F": []}
 
-    for item in ranking:
-        sexo = item["sexo"]
-        if sexo in resultado:
-            resultado[sexo].append(item)
+def _cumprimentos_ativos():
+    ids = _carregar_mapa_ids_atividades()
+    ids_todos = list(ids["P"] | ids["MV"] | ids["AB"] | ids["V"] | ids["APPS"])
+    if not ids_todos:
+        return [], ids
+
+    placeholders = ", ".join(["%s"] * len(ids_todos))
+    with get_connection() as connection:
+        rows = connection.execute(
+            f"""
+            WITH ultimos AS (
+                SELECT
+                    ct.*,
+                    ROW_NUMBER() OVER (
+                        PARTITION BY ct.adolescente_id, ct.atividade_id, ct.data_cumprimento
+                        ORDER BY ct.id DESC
+                    ) AS pos
+                FROM cumprimentos_tarefas ct
+                WHERE ct.atividade_id IN ({placeholders})
+            )
+            SELECT *
+            FROM ultimos
+            WHERE pos = 1 AND cumpriu = 1
+            """,
+            ids_todos,
+        ).fetchall()
+    return rows, ids
+
+
+def _mapa_adolescentes():
+    with get_connection() as connection:
+        rows = connection.execute(
+            """
+            SELECT id, nome, sexo, lider_ga, matricula, foto_path
+            FROM adolescentes
+            ORDER BY nome
+            """
+        ).fetchall()
+    return {item["id"]: item for item in rows}
+
+
+def mapa_pontuacao_por_adolescente():
+    adolescentes = _mapa_adolescentes()
+    cumprimentos, ids = _cumprimentos_ativos()
+
+    resultado = {}
+    for adolescente_id, adolescente in adolescentes.items():
+        resultado[adolescente_id] = {
+            "id": adolescente_id,
+            "nome": adolescente["nome"],
+            "sexo": adolescente["sexo"],
+            "lider_ga": adolescente["lider_ga"],
+            "matricula": adolescente["matricula"],
+            "foto_path": adolescente["foto_path"],
+            "semanas": {data: 0 for data in FASE1_SEMANAS},
+            "apps_marcado": False,
+            "pontos_tarefas": 0,
+            "pontos_apps_fase": 0,
+            "total_pontos": 0,
+            "cupons": 0,
+        }
+
+    for row in cumprimentos:
+        adolescente_id = row["adolescente_id"]
+        if adolescente_id not in resultado:
+            continue
+
+        atividade_id = row["atividade_id"]
+        data = row["data_cumprimento"]
+
+        if atividade_id in ids["APPS"]:
+            if data in FASE1_SEMANAS:
+                resultado[adolescente_id]["apps_marcado"] = True
+            continue
+
+        if data not in FASE1_SEMANAS:
+            continue
+
+        if atividade_id in ids["P"]:
+            resultado[adolescente_id]["semanas"][data] += PONTOS_FIXOS["P"]
+        elif atividade_id in ids["MV"]:
+            resultado[adolescente_id]["semanas"][data] += PONTOS_FIXOS["MV"]
+        elif atividade_id in ids["AB"]:
+            resultado[adolescente_id]["semanas"][data] += PONTOS_FIXOS["AB"]
+        elif atividade_id in ids["V"]:
+            resultado[adolescente_id]["semanas"][data] += PONTOS_FIXOS["V"]
+
+    for adolescente_id, item in resultado.items():
+        pontos_tarefas = sum(item["semanas"].values())
+        pontos_apps = PONTOS_FIXOS["APPS"] if item["apps_marcado"] else 0
+        total = pontos_tarefas + pontos_apps
+
+        item["pontos_tarefas"] = pontos_tarefas
+        item["pontos_apps_fase"] = pontos_apps
+        item["total_pontos"] = total
+        item["cupons"] = total // 80
 
     return resultado
 
 
-def ranking_por_lider_ga():
-    acumulado = {}
-    for item in ranking_geral():
-        lider = item["lider_ga"] or "-"
-        if lider not in acumulado:
-            acumulado[lider] = {
-                "lider_ga": lider,
-                "total_adolescentes": 0,
-                "total_pontos": 0,
-            }
-        acumulado[lider]["total_adolescentes"] += 1
-        acumulado[lider]["total_pontos"] += item["total_pontos"]
+def resumo_adolescente(adolescente_id):
+    mapa = mapa_pontuacao_por_adolescente()
+    return mapa.get(adolescente_id)
 
-    return sorted(
-        acumulado.values(),
-        key=lambda x: (-x["total_pontos"], x["lider_ga"]),
+
+def ranking_geral():
+    ranking = list(mapa_pontuacao_por_adolescente().values())
+    ranking.sort(
+        key=lambda item: (-item["cupons"], -item["total_pontos"], item["nome"].lower()),
     )
+    return ranking
 
 
-def ranking_lideres_mais_ativos():
-    with get_connection() as connection:
-        return connection.execute(
-            """
-            SELECT
-                u.id,
-                u.nome,
-                u.username,
-                u.role,
-                COUNT(ae.id) AS total_acoes,
-                COUNT(*) FILTER (WHERE ae.tipo_evento = 'cadastro_adolescente') AS adolescentes_cadastrados,
-                COUNT(*) FILTER (WHERE ae.tipo_evento = 'edicao_adolescente') AS adolescentes_editados,
-                COUNT(*) FILTER (WHERE ae.tipo_evento = 'lancamento_cumprimento') AS cumprimentos_lancados,
-                COUNT(*) FILTER (WHERE ae.tipo_evento = 'edicao_cumprimento') AS cumprimentos_editados
-            FROM usuarios u
-            LEFT JOIN auditoria_eventos ae
-                ON ae.usuario_id = u.id
-                AND ae.tipo_evento IN (
-                    'cadastro_adolescente',
-                    'edicao_adolescente',
-                    'lancamento_cumprimento',
-                    'edicao_cumprimento'
-                )
-            WHERE u.aprovado = 1
-            GROUP BY u.id, u.nome, u.username, u.role
-            ORDER BY total_acoes DESC, u.nome
-            """
-        ).fetchall()
+def ranking_por_sexo():
+    base = ranking_geral()
+    return {
+        "M": [item for item in base if item["sexo"] == "M"],
+        "F": [item for item in base if item["sexo"] == "F"],
+    }
 
 
 def resumo_dashboard():
     ranking = ranking_geral()
-    ranking_atividade = ranking_lideres_mais_ativos()
-
-    total_adolescentes = len(ranking)
-    total_pontos = sum(item["total_pontos"] for item in ranking)
-    lideres_ga = sorted({item["lider_ga"] for item in ranking if item["lider_ga"]})
-
-    top_5 = ranking[:5]
-
     return {
-        "total_adolescentes": total_adolescentes,
-        "total_pontos": total_pontos,
-        "lideres_ga": lideres_ga,
-        "top_5": top_5,
-        "ranking_lider_ga": ranking_por_lider_ga()[:5],
-        "lideres_mais_ativos": ranking_atividade[:5],
+        "total_adolescentes": len(ranking),
+        "total_pontos": sum(item["total_pontos"] for item in ranking),
+        "lideres_ga": sorted({item["lider_ga"] for item in ranking if item["lider_ga"]}),
+        "top_5": ranking[:5],
     }

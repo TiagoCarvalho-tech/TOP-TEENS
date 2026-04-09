@@ -3,109 +3,33 @@
 {% block content %}
 <section class="page-head">
     <div>
-        <p class="section-tag">Resultados</p>
-        <h2>Rankings gerais e por gênero</h2>
+        <p class="section-tag">Ranking</p>
+        <h2>Classificação geral</h2>
     </div>
 </section>
 
 <section class="card">
-    <div class="card-head">
-        <h3>Ranking geral</h3>
+    <div class="ranking-mobile-list">
+        {% for item in ranking %}
+        <article class="ranking-mobile-item {% if loop.index <= 3 %}top-{{ loop.index }}{% endif %}">
+            <div class="ranking-pos">{{ loop.index }}º</div>
+            {% if item.foto_path %}
+            <img class="ranking-photo" src="{{ url_for('static', filename=item.foto_path) }}" alt="Foto de {{ item.nome }}">
+            {% else %}
+            <div class="ranking-avatar">{{ item.nome[:1].upper() if item.nome else '?' }}</div>
+            {% endif %}
+            <div class="ranking-main">
+                <strong>{{ item.nome }}</strong>
+                <p>GA {{ item.lider_ga }}</p>
+            </div>
+            <div class="ranking-points">
+                <strong>{{ item.cupons }} cupons</strong>
+                <span>{{ item.total_pontos }} pts</span>
+            </div>
+        </article>
+        {% else %}
+        <p class="muted-page">Nenhum adolescente no ranking.</p>
+        {% endfor %}
     </div>
-    <table>
-        <thead>
-            <tr>
-                <th>#</th>
-                <th>Adolescente</th>
-                <th>Gênero</th>
-                <th>GA</th>
-                <th>Pontos em atividades</th>
-                <th>Pontos APPS (fase)</th>
-                <th>Total</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for item in ranking %}
-            <tr>
-                <td>{{ loop.index }}</td>
-                <td>{{ item.nome }}</td>
-                <td>{{ "Masculino" if item.sexo == "M" else "Feminino" }}</td>
-                <td>{{ item.lider_ga }}</td>
-                <td>{{ item.pontos_tarefas }}</td>
-                <td>{{ item.pontos_apps_fase }}</td>
-                <td><strong>{{ item.total_pontos }}</strong></td>
-            </tr>
-            {% else %}
-            <tr><td colspan="7">Nenhuma pontuação disponível.</td></tr>
-            {% endfor %}
-        </tbody>
-    </table>
-</section>
-
-<section class="grid-two">
-    <article class="card">
-        <div class="card-head">
-            <h3>Masculino</h3>
-        </div>
-        <ol class="ranking-list">
-            {% for item in ranking_genero["M"] %}
-            <li><span>{{ item.nome }}</span><strong>{{ item.total_pontos }}</strong></li>
-            {% else %}
-            <li>Nenhum adolescente masculino cadastrado.</li>
-            {% endfor %}
-        </ol>
-    </article>
-
-    <article class="card">
-        <div class="card-head">
-            <h3>Feminino</h3>
-        </div>
-        <ol class="ranking-list">
-            {% for item in ranking_genero["F"] %}
-            <li><span>{{ item.nome }}</span><strong>{{ item.total_pontos }}</strong></li>
-            {% else %}
-            <li>Nenhum adolescente feminino cadastrado.</li>
-            {% endfor %}
-        </ol>
-    </article>
-</section>
-
-<section class="card">
-    <div class="card-head">
-        <div>
-            <h3>Líderes mais ativos no sistema</h3>
-            <p class="muted-page">A contagem considera cadastros e edições de adolescentes, além de lançamentos e edições de cumprimentos.</p>
-        </div>
-    </div>
-    <table>
-        <thead>
-            <tr>
-                <th>#</th>
-                <th>Nome</th>
-                <th>Perfil</th>
-                <th>Total de ações</th>
-                <th>Cadastros</th>
-                <th>Edições de adolescente</th>
-                <th>Lançamentos</th>
-                <th>Edições de cumprimento</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for item in lideres_mais_ativos %}
-            <tr>
-                <td>{{ loop.index }}</td>
-                <td>{{ item.nome }}</td>
-                <td>{{ "Master" if item.role == "MASTER" else "Líder" }}</td>
-                <td><strong>{{ item.total_acoes }}</strong></td>
-                <td>{{ item.adolescentes_cadastrados }}</td>
-                <td>{{ item.adolescentes_editados }}</td>
-                <td>{{ item.cumprimentos_lancados }}</td>
-                <td>{{ item.cumprimentos_editados }}</td>
-            </tr>
-            {% else %}
-            <tr><td colspan="8">Ainda não há atividade registrada para os usuários.</td></tr>
-            {% endfor %}
-        </tbody>
-    </table>
 </section>
 {% endblock %}

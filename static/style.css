@@ -640,6 +640,15 @@ thead th {
     font-size: 1.8rem;
 }
 
+.ga-mobile-photo {
+    width: 56px;
+    height: 56px;
+    border-radius: 999px;
+    object-fit: cover;
+    border: 2px solid #fff;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.12);
+}
+
 .ga-mobile-body h3 {
     margin: 0;
     font-size: 1.05rem;
@@ -966,6 +975,15 @@ thead th {
     font-size: 1.6rem;
 }
 
+.pontuacao-resumo-photo {
+    width: 54px;
+    height: 54px;
+    border-radius: 999px;
+    object-fit: cover;
+    border: 2px solid #fff;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.12);
+}
+
 .pontuacao-resumo-card h4 {
     margin: 0;
     font-size: 1.05rem;
@@ -1060,6 +1078,88 @@ thead th {
 .pontuacao-apps-card h4 {
     margin: 0;
     color: #d47a49;
+}
+
+.ranking-mobile-list {
+    display: grid;
+    gap: 10px;
+}
+
+.ranking-mobile-item {
+    display: grid;
+    grid-template-columns: auto auto 1fr auto;
+    gap: 10px;
+    align-items: center;
+    border: 1px solid rgba(255, 140, 0, 0.15);
+    border-radius: 14px;
+    padding: 10px;
+    background: #fffdf8;
+}
+
+.ranking-mobile-item.top-1 {
+    border-color: rgba(255, 186, 0, 0.55);
+    background: #fff9e7;
+}
+
+.ranking-mobile-item.top-2 {
+    border-color: rgba(186, 186, 186, 0.55);
+    background: #fafafa;
+}
+
+.ranking-mobile-item.top-3 {
+    border-color: rgba(210, 130, 88, 0.55);
+    background: #fff4ee;
+}
+
+.ranking-pos {
+    font-weight: 700;
+    color: #8f5f38;
+    min-width: 30px;
+}
+
+.ranking-avatar,
+.ranking-photo {
+    width: 46px;
+    height: 46px;
+    border-radius: 999px;
+}
+
+.ranking-avatar {
+    display: grid;
+    place-items: center;
+    background: #f8f2ef;
+    color: #e47a45;
+    font-weight: 800;
+}
+
+.ranking-photo {
+    object-fit: cover;
+    border: 2px solid #fff;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.12);
+}
+
+.ranking-main strong {
+    display: block;
+}
+
+.ranking-main p {
+    margin: 2px 0 0;
+    color: #777;
+    font-size: 0.86rem;
+}
+
+.ranking-points {
+    text-align: right;
+}
+
+.ranking-points strong {
+    display: block;
+    color: #d45d2a;
+}
+
+.ranking-points span {
+    color: #8a8a8a;
+    font-size: 0.86rem;
 }
 
 .pontuacao-apps-list {

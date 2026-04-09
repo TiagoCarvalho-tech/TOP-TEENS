@@ -13,19 +13,6 @@
         </div>
         <form method="get" class="ga-mobile-filters">
             <input type="text" name="busca" maxlength="80" placeholder="Buscar adolescente" value="{{ filtros.busca }}">
-            {% if usuario_master() %}
-            <select name="lider_ga">
-                <option value="">Todos os GA</option>
-                {% for lider in lideres %}
-                <option value="{{ lider }}" {% if filtros.lider_ga == lider %}selected{% endif %}>{{ lider }}</option>
-                {% endfor %}
-            </select>
-            {% endif %}
-            <select name="sexo">
-                <option value="">Todos os gêneros</option>
-                <option value="M" {% if filtros.sexo == "M" %}selected{% endif %}>Masculino</option>
-                <option value="F" {% if filtros.sexo == "F" %}selected{% endif %}>Feminino</option>
-            </select>
             <button type="submit">Filtrar</button>
         </form>
     </header>
@@ -34,7 +21,11 @@
         {% for adolescente in adolescentes %}
         {% set inicial = adolescente.nome[:1].upper() if adolescente.nome else '?' %}
         <article class="ga-mobile-card">
+            {% if adolescente.foto_path %}
+            <img class="ga-mobile-photo" src="{{ url_for('static', filename=adolescente.foto_path) }}" alt="Foto de {{ adolescente.nome }}">
+            {% else %}
             <div class="ga-mobile-avatar">{{ inicial }}</div>
+            {% endif %}
             <div class="ga-mobile-body">
                 <h3><a href="{{ url_for('detalhe_adolescente', adolescente_id=adolescente.id) }}">{{ adolescente.nome }}</a></h3>
                 <p>
@@ -45,11 +36,12 @@
                     {% endif %}
                     ({{ adolescente.aniversario_curto }})
                 </p>
+                <p>{{ adolescente.pontuacao_total }} pts • {{ adolescente.cupons }} cupons</p>
             </div>
             <details class="ga-mobile-menu">
                 <summary aria-label="Ações">&#8942;</summary>
                 <div class="ga-mobile-menu-content">
-                    <a href="{{ url_for('detalhe_adolescente', adolescente_id=adolescente.id) }}">Ver perfil</a>
+                    <a href="{{ url_for('detalhe_adolescente', adolescente_id=adolescente.id) }}">Pontuação</a>
                     <a href="{{ url_for('editar_adolescente', adolescente_id=adolescente.id) }}">Editar</a>
                     <form method="post" action="{{ url_for('excluir_adolescente', adolescente_id=adolescente.id) }}">
                         <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">

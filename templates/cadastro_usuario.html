@@ -5,43 +5,33 @@
     <article class="auth-card wide">
         <div class="auth-head">
             <div>
-                <p class="section-tag">Conta de líder</p>
-                <h2>Solicitar acesso</h2>
-                <p class="muted">O usuário master precisa aprovar seu cadastro antes do primeiro login.</p>
+                <h2>Criar conta de líder</h2>
+                <p class="muted">Cadastro simples para entrar no sistema.</p>
             </div>
             <a class="button-link alt" href="{{ url_for('login') }}">Voltar ao login</a>
         </div>
 
         <form method="post" class="form-grid two-cols">
             <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
-            <label>
+            <label class="full-span">
                 Nome completo
                 <input type="text" name="nome" maxlength="80" pattern="[A-Za-zÀ-ÿ' -]{3,80}" required>
             </label>
             <label>
-                Contato
-                <input type="tel" name="contato" maxlength="15" placeholder="(92) 99999-9999" required>
-            </label>
-            <label>
-                Aniversário
+                Data de aniversário
                 <input type="date" name="aniversario" min="1950-01-01" max="{{ today }}" required>
             </label>
             <label>
-                Nome de usuário
-                <input type="text" name="username" maxlength="30" pattern="[a-z0-9._-]{4,30}" placeholder="ex.: maria.silva" required>
-                <small class="field-help">Use de 4 a 30 caracteres com letras minúsculas, números, ponto, hífen ou sublinhado. Exemplo: <strong>maria.silva</strong></small>
+                Nome do GA
+                <input type="text" name="lider_ga" maxlength="80" pattern="[A-Za-zÀ-ÿ' -]{3,80}" required>
             </label>
-            <label>
+            <label class="full-span">
                 Senha
                 <input type="password" name="senha" minlength="12" maxlength="128" required>
-                <small class="field-help">A senha precisa ter no mínimo 12 caracteres, com pelo menos 1 letra maiúscula, 1 letra minúscula, 1 número e 1 caractere especial.</small>
-            </label>
-            <label>
-                Confirmar senha
-                <input type="password" name="confirmar_senha" minlength="12" maxlength="128" required>
+                <small class="field-help">Use pelo menos 12 caracteres com letra maiúscula, minúscula, número e símbolo.</small>
             </label>
             <div class="form-actions">
-                <button type="submit">Enviar para aprovação</button>
+                <button type="submit">Criar cadastro</button>
             </div>
         </form>
     </article>

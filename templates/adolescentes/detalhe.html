@@ -1,57 +1,84 @@
 {% extends "base.html" %}
 
 {% block content %}
-<section class="perfil-mobile-screen">
-    <header class="perfil-mobile-header">
-        <div class="perfil-mobile-top">
-            <a class="perfil-back" href="{{ url_for('listar_adolescentes') }}">‹</a>
-            <h2>Perfil</h2>
-            <a class="button-link alt" href="{{ url_for('editar_adolescente', adolescente_id=adolescente.id) }}">Editar</a>
+<section class="pontuacao-mobile-screen">
+    <header class="pontuacao-mobile-header">
+        <div class="pontuacao-mobile-top">
+            <a class="pontuacao-back" href="{{ url_for('listar_adolescentes') }}">‹</a>
+            <h3>Pontuação</h3>
+            <div class="pontuacao-mobile-icons" aria-hidden="true">GA</div>
         </div>
-        <h3>{{ adolescente.nome }}</h3>
-        <p>Matrícula {{ adolescente.matricula }} • GA {{ adolescente.lider_ga }}</p>
-        <p>Responsável: {{ adolescente.pai if adolescente.pai else (adolescente.mae if adolescente.mae else "-") }}</p>
     </header>
 
-    <div class="perfil-mobile-content">
-        <section class="perfil-metric-grid">
-            <article class="perfil-metric-card">
-                <span>Total</span>
-                <strong>{{ pontuacao.total_pontos if pontuacao else 0 }}</strong>
-            </article>
-            <article class="perfil-metric-card">
-                <span>Atividades</span>
-                <strong>{{ pontuacao.pontos_tarefas if pontuacao else 0 }}</strong>
-            </article>
-            <article class="perfil-metric-card">
-                <span>APPS</span>
-                <strong>{{ pontuacao.pontos_apps_fase if pontuacao else 0 }}</strong>
-            </article>
-            <article class="perfil-metric-card">
-                <span>Registros</span>
-                <strong>{{ cumprimentos|length }}</strong>
-            </article>
-        </section>
+    <article class="pontuacao-resumo-card">
+        {% if adolescente.foto_path %}
+        <img class="pontuacao-resumo-photo" src="{{ url_for('static', filename=adolescente.foto_path) }}" alt="Foto de {{ adolescente.nome }}">
+        {% else %}
+        <div class="pontuacao-resumo-avatar">{{ adolescente.nome[:1].upper() if adolescente.nome else '?' }}</div>
+        {% endif %}
+        <div>
+            <h4>{{ adolescente.nome }}</h4>
+            <p>Total: {{ pontuacao.total_pontos if pontuacao else 0 }} pts</p>
+            <p class="pontuacao-total">Cupons: {{ pontuacao.cupons if pontuacao else 0 }}</p>
+        </div>
+    </article>
 
-        <section class="perfil-block">
-            <div class="perfil-block-head">
-                <h4>Cumprimentos registrados</h4>
+    <div class="pontuacao-semana-list">
+        {% for nome_semana, data_semana in semanas_fase1 %}
+        {% set partes = data_semana.split('-') %}
+        {% set data_curta = partes[2] ~ '/' ~ partes[1] %}
+        <form method="post" class="pontuacao-semana-card">
+            <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
+            <input type="hidden" name="action" value="salvar_semana">
+            <input type="hidden" name="semana_data" value="{{ data_semana }}">
+            <div class="pontuacao-semana-head">
+                <span>{{ nome_semana }} - {{ data_curta }}</span>
+                <strong>{{ pontuacao.semanas.get(data_semana, 0) if pontuacao else 0 }} pts</strong>
             </div>
-            <div class="perfil-list">
-                {% for item in cumprimentos %}
-                <article class="perfil-list-item">
-                    <div>
-                        <strong>{{ item.atividade_nome }}</strong>
-                        <p>{{ item.data_cumprimento }} • {{ "Cumpriu" if item.cumpriu else "Não cumpriu" }}</p>
-                        <p>Falta justificada: {{ "Sim" if item.falta_justificada else "Não" }}</p>
-                    </div>
-                    <span>{{ item.atividade_pontos if item.cumpriu else 0 }} pts</span>
-                </article>
-                {% else %}
-                <p class="muted-page">Nenhum cumprimento registrado.</p>
-                {% endfor %}
+            <div class="pontuacao-pills">
+                <label class="pontuacao-pill {% if marcacoes_semana[data_semana]['P'] %}active{% endif %}">
+                    <input type="checkbox" name="itens" value="P" onchange="this.form.submit()" {% if marcacoes_semana[data_semana]['P'] %}checked{% endif %}>
+                    <span>P</span>
+                </label>
+                <label class="pontuacao-pill {% if marcacoes_semana[data_semana]['MV'] %}active{% endif %}">
+                    <input type="checkbox" name="itens" value="MV" onchange="this.form.submit()" {% if marcacoes_semana[data_semana]['MV'] %}checked{% endif %}>
+                    <span>MV</span>
+                </label>
+                <label class="pontuacao-pill {% if marcacoes_semana[data_semana]['AB'] %}active{% endif %}">
+                    <input type="checkbox" name="itens" value="AB" onchange="this.form.submit()" {% if marcacoes_semana[data_semana]['AB'] %}checked{% endif %}>
+                    <span>AB</span>
+                </label>
+                <label class="pontuacao-pill {% if marcacoes_semana[data_semana]['V'] %}active{% endif %}">
+                    <input type="checkbox" name="itens" value="V" onchange="this.form.submit()" {% if marcacoes_semana[data_semana]['V'] %}checked{% endif %}>
+                    <span>V</span>
+                </label>
             </div>
-        </section>
+            <div class="form-actions">
+                <button type="submit">Salvar semana</button>
+            </div>
+        </form>
+        {% endfor %}
     </div>
+
+    <form method="post" class="pontuacao-apps-card">
+        <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
+        <input type="hidden" name="action" value="salvar_apps">
+        <h4>APPs</h4>
+        <p class="muted-page">Vale 40 pontos</p>
+        <label class="pontuacao-pill {% if apps_marcado %}active{% endif %}">
+            <input type="checkbox" name="apps_marcado" value="1" onchange="this.form.submit()" {% if apps_marcado %}checked{% endif %}>
+            <span>APPS</span>
+        </label>
+        <div class="form-actions">
+            <button type="submit">Salvar APPs</button>
+        </div>
+    </form>
+
+    <section class="pontuacao-apps-card">
+        <h4>Total geral da fase</h4>
+        <p class="muted-page">Semanas + APPs</p>
+        <strong class="pontuacao-total">{{ pontuacao.total_pontos if pontuacao else 0 }} pts</strong>
+        <p class="muted-page">Cupons acumulados: {{ pontuacao.cupons if pontuacao else 0 }}</p>
+    </section>
 </section>
 {% endblock %}

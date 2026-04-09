@@ -187,6 +187,19 @@ def obter_cumprimento_por_chave(adolescente_id, atividade_id, data_cumprimento):
         ).fetchone()
 
 
+def excluir_cumprimento_por_chave(adolescente_id, atividade_id, data_cumprimento):
+    with get_connection() as connection:
+        connection.execute(
+            """
+            DELETE FROM cumprimentos_tarefas
+            WHERE adolescente_id = %s
+              AND atividade_id = %s
+              AND data_cumprimento = %s
+            """,
+            (int(adolescente_id), int(atividade_id), data_cumprimento),
+        )
+
+
 def obter_cumprimento(cumprimento_id):
     with get_connection() as connection:
         return connection.execute(

@@ -7,6 +7,7 @@ import secrets
 
 from flask import Flask, abort, flash, redirect, render_template, request, session, url_for
 from werkzeug.security import check_password_hash, generate_password_hash
+from werkzeug.utils import secure_filename
 
 import Adolescente
 import Atividade
@@ -38,24 +39,25 @@ app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
 app.config["SESSION_COOKIE_SECURE"] = environ.get("TOPTEENS_HTTPS_ONLY", "0") == "1"
 app.config["PERMANENT_SESSION_LIFETIME"] = timedelta(hours=8)
 app.config["MAX_CONTENT_LENGTH"] = 1024 * 1024
-DATAS_FASE1_APPS = {
-    "2026-03-15",
-    "2026-03-22",
-    "2026-03-29",
-    "2026-04-12",
-}
 FASE1_SEMANAS = [
     ("Semana 1", "2026-03-15"),
     ("Semana 2", "2026-03-22"),
     ("Semana 3", "2026-03-29"),
     ("Semana 4", "2026-04-12"),
 ]
-ATIVIDADES_SEMANA_FASE1 = [
-    "Presença culto",
-    "Meditação e versículo",
-    "Bíblia e anotação",
-    "Visitante",
-]
+DATAS_FASE1 = {data for _, data in FASE1_SEMANAS}
+DATAS_FASE1_APPS = set(DATAS_FASE1)
+UPLOADS_DIR = BASE_DIR / "static" / "uploads"
+UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
+EXTENSOES_FOTO_PERMITIDAS = {"jpg", "jpeg", "png", "webp"}
+
+ATIVIDADES_FASE = {
+    "P": {"nome": "Presença", "pontos": 10, "aliases": {"presença", "presenca", "presença culto"}},
+    "MV": {"nome": "Meditação e Versículo", "pontos": 20, "aliases": {"meditação e versículo", "meditacao e versiculo", "meditação"}},
+    "AB": {"nome": "Anotação e Bíblia", "pontos": 10, "aliases": {"anotação e bíblia", "anotacao e biblia", "bíblia e anotação", "biblia e anotacao"}},
+    "V": {"nome": "Visitante", "pontos": 1, "aliases": {"visitante"}},
+    "APPS": {"nome": "APPS", "pontos": 40, "aliases": {"apps"}},
+}
 
 
 def login_obrigatorio(view):
@@ -133,6 +135,11 @@ def somente_letras_espacos(texto):
     return bool(re.fullmatch(r"[A-Za-zÀ-ÿ' -]+", texto))
 
 
+def nome_slug(texto):
+    base = re.sub(r"[^a-z0-9]+", "-", normalizar_texto(texto).lower())
+    return base.strip("-")
+
+
 def obter_lider_ga_usuario():
     return normalizar_texto(session.get("usuario_lider_ga", ""))
 
@@ -141,10 +148,42 @@ def lider_ga_configurado():
     return bool(obter_lider_ga_usuario())
 
 
+def extensao_foto_permitida(filename):
+    if "." not in filename:
+        return False
+    extensao = filename.rsplit(".", 1)[1].lower()
+    return extensao in EXTENSOES_FOTO_PERMITIDAS
+
+
+def salvar_foto_adolescente(arquivo, nome_base):
+    if not arquivo or not arquivo.filename:
+        return ""
+    if not extensao_foto_permitida(arquivo.filename):
+        return None
+
+    extensao = arquivo.filename.rsplit(".", 1)[1].lower()
+    nome_arquivo = secure_filename(f"{nome_slug(nome_base)}-{secrets.token_hex(8)}.{extensao}")
+    destino = UPLOADS_DIR / nome_arquivo
+    arquivo.save(destino)
+    return f"uploads/{nome_arquivo}"
+
+
+def mapear_atividades_fixas_ids():
+    atividades = Atividade.listar_atividades(somente_ativas=True)
+    ids = {}
+    for atividade in atividades:
+        nome = normalizar_texto(atividade["nome"]).lower()
+        for codigo, dados in ATIVIDADES_FASE.items():
+            if nome in dados["aliases"]:
+                ids[codigo] = atividade["id"]
+                break
+    return ids
+
+
 def data_permitida_fase1_apps(valor_data):
     if not valor_data:
         return False
-    return valor_data in DATAS_FASE1_APPS
+    return valor_data in DATAS_FASE1
 
 
 def criar_usuario_padrao():
@@ -173,19 +212,19 @@ def criar_usuario_padrao():
 
 def popular_atividades_iniciais():
     atividades_padrao = [
-        ("Presença culto", 10, "Registrar presença no culto"),
-        ("Meditação e versículo", 10, "Cumprir meditação e versículo da fase"),
-        ("Bíblia e anotação", 10, "Leitura bíblica com anotação"),
-        ("Visitante", 1, "Levar um visitante"),
-        ("APPS", 40, "Pontuação de fase do APPS com regra de presença"),
-        ("Não cumpriu nenhuma atividade", 0, "Lançamento sem pontuação"),
+        ("Presença", 10, "Presença da semana"),
+        ("Meditação e Versículo", 20, "Meditação + versículo"),
+        ("Anotação e Bíblia", 10, "Leitura com anotação"),
+        ("Visitante", 1, "Levar visitante"),
+        ("APPS", 40, "Atividade especial da fase"),
     ]
     aliases = {
-        "Presença": "Presença culto",
-        "Meditação": "Meditação e versículo",
+        "Presença culto": "Presença",
+        "Meditação e versículo": "Meditação e Versículo",
+        "Bíblia e anotação": "Anotação e Bíblia",
         "Apps": "APPS",
     }
-    nomes_oficiais = {nome.lower() for nome, _, _ in atividades_padrao}
+    nomes_oficiais = {nome.lower().strip() for nome, _, _ in atividades_padrao}
 
     with get_connection() as connection:
         # Migração simples de nomes antigos para os novos, sem mexer nos pontos já ajustados manualmente.
@@ -218,15 +257,15 @@ def popular_atividades_iniciais():
                     """,
                     (nome, pontos, descricao),
                 )
-
-        # Garante APPS como atividade ativa e com 40 pontos no formulário.
-        connection.execute(
-            """
-            UPDATE atividades
-            SET pontos = 40, ativo = 1
-            WHERE lower(trim(nome)) = lower('APPS')
-            """
-        )
+            else:
+                connection.execute(
+                    """
+                    UPDATE atividades
+                    SET pontos = %s, ativo = 1
+                    WHERE id = %s
+                    """,
+                    (pontos, atividade["id"]),
+                )
 
         # Mantém somente as atividades oficiais ativas.
         connection.execute(
@@ -306,9 +345,8 @@ def validar_campos_adolescente(formulario):
     for erro in [
         validar_nome_pessoa(formulario.get("nome"), "Nome"),
         validar_nascimento(formulario.get("nascimento")),
-        validar_contato(formulario.get("contato")),
+        "O campo Contato do responsável é obrigatório." if not normalizar_texto(formulario.get("contato")) else validar_contato(formulario.get("contato")),
         validar_nome_pessoa(formulario.get("responsavel"), "Nome do Responsável"),
-        validar_lider_ga(formulario.get("lider_ga")),
     ]:
         if erro:
             return erro
@@ -389,20 +427,9 @@ def validar_troca_senha(formulario):
 
 
 def validar_atualizacao_perfil(formulario):
-    aniversario = formulario.get("aniversario")
-
-    erro_aniversario = None
-    if not aniversario:
-        erro_aniversario = "O campo Aniversário é obrigatório."
-    else:
-        erro_aniversario = validar_nascimento(aniversario)
-        if erro_aniversario:
-            erro_aniversario = erro_aniversario.replace("Data de nascimento", "Aniversário")
-
     for erro in [
         validar_nome_pessoa(formulario.get("nome"), "Nome"),
-        "O campo Contato é obrigatório." if not normalizar_texto(formulario.get("contato")) else validar_contato(formulario.get("contato")),
-        erro_aniversario,
+        validar_lider_ga(formulario.get("lider_ga")),
     ]:
         if erro:
             return erro
@@ -411,11 +438,9 @@ def validar_atualizacao_perfil(formulario):
 
 def validar_cadastro_usuario(formulario):
     nome = normalizar_texto(formulario.get("nome"))
-    contato = normalizar_texto(formulario.get("contato"))
     aniversario = formulario.get("aniversario")
-    username = normalizar_texto(formulario.get("username")).lower()
+    lider_ga = normalizar_texto(formulario.get("lider_ga"))
     senha = formulario.get("senha", "")
-    confirmar = formulario.get("confirmar_senha", "")
 
     erro_aniversario = None
     if not aniversario:
@@ -427,19 +452,15 @@ def validar_cadastro_usuario(formulario):
 
     for erro in [
         validar_nome_pessoa(nome, "Nome"),
-        "O campo Contato é obrigatório." if not contato else validar_contato(contato),
+        validar_lider_ga(lider_ga),
         erro_aniversario,
     ]:
         if erro:
             return erro
 
-    if not re.fullmatch(r"[a-z0-9._-]{4,30}", username):
-        return "O usuário deve ter 4 a 30 caracteres com letras minúsculas, números, ponto, hífen ou sublinhado."
     erro_senha = validar_password_forte(senha)
     if erro_senha:
         return erro_senha
-    if senha != confirmar:
-        return "A confirmação da senha não confere."
     return None
 
 
@@ -448,19 +469,28 @@ def usuario_pode_acessar_adolescente(adolescente):
         return False
     if usuario_master():
         return True
-    lider_ga = obter_lider_ga_usuario()
-    if not lider_ga:
+    usuario_id = session.get("usuario_id")
+    if not usuario_id:
         return False
-    return adolescente["lider_ga"] == lider_ga
+    if adolescente.get("lider_id") == usuario_id:
+        return True
+    lider_ga = obter_lider_ga_usuario()
+    return bool(lider_ga) and adolescente.get("lider_id") is None and adolescente.get("lider_ga") == lider_ga
 
 
 def adolescentes_disponiveis():
     if usuario_master():
         return Adolescente.listar_adolescentes()
-    lider_ga = obter_lider_ga_usuario()
-    if not lider_ga:
+    usuario_id = session.get("usuario_id")
+    if not usuario_id:
         return []
-    return Adolescente.listar_adolescentes(lider_ga=lider_ga)
+    lider_ga = obter_lider_ga_usuario()
+    adolescentes = Adolescente.listar_adolescentes(lider_id=usuario_id)
+    if adolescentes:
+        return adolescentes
+    if lider_ga:
+        return Adolescente.listar_adolescentes(lider_ga=lider_ga)
+    return []
 
 
 def obter_adolescente_com_permissao(adolescente_id):
@@ -478,10 +508,23 @@ def verificar_adolescente_do_formulario():
 
 
 def atividades_semana_fase1():
-    ordem = {nome: indice for indice, nome in enumerate(ATIVIDADES_SEMANA_FASE1)}
+    ordem_codigos = ["P", "MV", "AB", "V"]
+    ordem = {
+        codigo: indice
+        for indice, codigo in enumerate(ordem_codigos)
+    }
     atividades = Atividade.listar_atividades(somente_ativas=True)
-    filtradas = [item for item in atividades if item["nome"] in ATIVIDADES_SEMANA_FASE1]
-    filtradas.sort(key=lambda item: ordem.get(item["nome"], 99))
+    filtradas = []
+    for item in atividades:
+        nome = normalizar_texto(item["nome"]).lower()
+        for codigo in ordem_codigos:
+            if nome in ATIVIDADES_FASE[codigo]["aliases"]:
+                novo = dict(item)
+                novo["codigo"] = codigo
+                novo["pontos"] = ATIVIDADES_FASE[codigo]["pontos"]
+                filtradas.append(novo)
+                break
+    filtradas.sort(key=lambda item: ordem.get(item["codigo"], 99))
     return filtradas
 
 
@@ -679,7 +722,7 @@ def aplicar_headers_seguranca(response):
 @app.route("/")
 def index():
     if "usuario_id" in session:
-        return redirect(url_for("dashboard"))
+        return redirect(url_for("listar_adolescentes"))
     return redirect(url_for("login"))
 
 
@@ -691,35 +734,36 @@ def cadastro_usuario():
             flash(erro, "danger")
         else:
             nome = normalizar_texto(request.form["nome"])
-            contato = Adolescente.normalizar_contato(request.form["contato"])
             aniversario = request.form["aniversario"]
-            username = normalizar_texto(request.form["username"]).lower()
+            lider_ga = normalizar_texto(request.form["lider_ga"])
+            username_base = nome_slug(nome)[:20] or "lider"
+            username = f"{username_base}-{secrets.token_hex(3)}"
 
             with get_connection() as connection:
                 existente = connection.execute(
-                    "SELECT id FROM usuarios WHERE username = %s",
-                    (username,),
+                    "SELECT id FROM usuarios WHERE lower(nome) = lower(%s)",
+                    (nome,),
                 ).fetchone()
                 if existente:
-                    flash("Esse nome de usuário já está em uso.", "danger")
+                    flash("Já existe líder cadastrado com esse nome. Use outro nome ou ajuste na escrita.", "danger")
                 else:
                     connection.execute(
                         """
                         INSERT INTO usuarios (
                             nome, contato, aniversario, username, senha_hash, role, aprovado, lider_ga
                         )
-                        VALUES (%s, %s, %s, %s, %s, 'LIDER', 0, %s)
+                        VALUES (%s, %s, %s, %s, %s, 'LIDER', 1, %s)
                         """,
                         (
                             nome,
-                            contato,
+                            "",
                             aniversario,
                             username,
                             generate_password_hash(request.form["senha"]),
-                            "",
+                            lider_ga,
                         ),
                     )
-                    flash("Cadastro enviado com sucesso. Aguarde a aprovação do usuário master.", "success")
+                    flash("Cadastro criado com sucesso. Faça login para entrar.", "success")
                     return redirect(url_for("login"))
 
     return render_template("cadastro_usuario.html")
@@ -728,26 +772,21 @@ def cadastro_usuario():
 @app.route("/login", methods=["GET", "POST"])
 def login():
     if request.method == "POST":
-        username = normalizar_texto(request.form.get("username", "")).lower()
+        identificador = normalizar_texto(request.form.get("nome", ""))
         senha = request.form.get("senha", "")
 
         with get_connection() as connection:
             usuario = connection.execute(
-                "SELECT * FROM usuarios WHERE username = %s",
-                (username,),
+                "SELECT * FROM usuarios WHERE lower(nome) = lower(%s)",
+                (identificador,),
             ).fetchone()
-
-            if usuario and usuario["bloqueado_ate"]:
-                bloqueado_ate = datetime.fromisoformat(usuario["bloqueado_ate"])
-                if bloqueado_ate > datetime.now():
-                    flash("Conta temporariamente bloqueada por tentativas inválidas. Tente novamente mais tarde.", "danger")
-                    return render_template("login.html")
+            if usuario is None:
+                usuario = connection.execute(
+                    "SELECT * FROM usuarios WHERE username = %s",
+                    (identificador.lower(),),
+                ).fetchone()
 
         if usuario and check_password_hash(usuario["senha_hash"], senha):
-            if not usuario["aprovado"]:
-                flash("Seu cadastro ainda está pendente de aprovação do usuário master.", "warning")
-                return render_template("login.html")
-
             with get_connection() as connection:
                 connection.execute(
                     """
@@ -759,26 +798,9 @@ def login():
                 )
             registrar_sessao(usuario)
             flash("Login realizado com sucesso.", "success")
-            return redirect(url_for("dashboard"))
+            return redirect(url_for("listar_adolescentes"))
 
-        if usuario:
-            tentativas = usuario["tentativas_falhas"] + 1
-            bloqueado_ate = None
-            if tentativas >= 5:
-                bloqueado_ate = (datetime.now() + timedelta(minutes=15)).isoformat(timespec="seconds")
-                tentativas = 0
-
-            with get_connection() as connection:
-                connection.execute(
-                    """
-                    UPDATE usuarios
-                    SET tentativas_falhas = %s, bloqueado_ate = %s
-                    WHERE id = %s
-                    """,
-                    (tentativas, bloqueado_ate, usuario["id"]),
-                )
-
-        flash("Usuário ou senha inválidos.", "danger")
+        flash("Nome ou senha inválidos.", "danger")
 
     return render_template("login.html")
 
@@ -985,96 +1007,135 @@ def editar_meu_cadastro():
             return redirect(url_for("login"))
 
         if request.method == "POST":
-            erro = validar_atualizacao_perfil(request.form)
-            if erro:
-                flash(erro, "danger")
+            action = request.form.get("action", "").strip()
+            if action == "senha":
+                nova_senha = request.form.get("nova_senha", "")
+                erro = validar_password_forte(nova_senha)
+                if erro:
+                    flash(erro, "danger")
+                else:
+                    connection.execute(
+                        """
+                        UPDATE usuarios
+                        SET senha_hash = %s
+                        WHERE id = %s
+                        """,
+                        (generate_password_hash(nova_senha), usuario["id"]),
+                    )
+                    flash("Senha atualizada com sucesso.", "success")
+                    return redirect(url_for("configuracoes"))
             else:
-                nome = normalizar_texto(request.form["nome"])
-                contato = Adolescente.normalizar_contato(request.form["contato"])
-                aniversario = request.form["aniversario"]
+                erro = validar_atualizacao_perfil(request.form)
+                if erro:
+                    flash(erro, "danger")
+                else:
+                    nome = normalizar_texto(request.form["nome"])
+                    novo_ga = normalizar_texto(request.form["lider_ga"])
+                    ga_antigo = usuario["lider_ga"] or ""
 
-                connection.execute(
-                    """
-                    UPDATE usuarios
-                    SET nome = %s, contato = %s, aniversario = %s
-                    WHERE id = %s
-                    """,
-                    (nome, contato, aniversario, usuario["id"]),
-                )
-                session["usuario_nome"] = nome
-                registrar_auditoria("edicao_perfil", "usuario", usuario["id"], "Perfil atualizado pelo próprio usuário.")
-                flash("Cadastro atualizado com sucesso.", "success")
-                return redirect(url_for("dashboard"))
+                    connection.execute(
+                        """
+                        UPDATE usuarios
+                        SET nome = %s, lider_ga = %s
+                        WHERE id = %s
+                        """,
+                        (nome, novo_ga, usuario["id"]),
+                    )
+                    connection.execute(
+                        """
+                        UPDATE adolescentes
+                        SET lider_ga = %s, lider_id = %s
+                        WHERE lider_id = %s
+                        """,
+                        (novo_ga, usuario["id"], usuario["id"]),
+                    )
+                    if ga_antigo:
+                        connection.execute(
+                            """
+                            UPDATE adolescentes
+                            SET lider_ga = %s, lider_id = %s
+                            WHERE lider_id IS NULL AND lower(lider_ga) = lower(%s)
+                            """,
+                            (novo_ga, usuario["id"], ga_antigo),
+                        )
+
+                    session["usuario_nome"] = nome
+                    session["usuario_lider_ga"] = novo_ga
+                    flash("Configurações atualizadas com sucesso.", "success")
+                    return redirect(url_for("configuracoes"))
 
     return render_template("perfil_usuario.html", usuario=usuario)
+
+
+@app.route("/configuracoes", methods=["GET", "POST"])
+@login_obrigatorio
+def configuracoes():
+    return editar_meu_cadastro()
 
 
 @app.route("/dashboard")
 @login_obrigatorio
 def dashboard():
-    ranking_visivel = filtrar_ranking_por_permissao(Pontuacao.ranking_geral())
-    resumo = montar_resumo_dashboard(ranking_visivel)
-    aniversariantes = filtrar_aniversariantes_por_permissao(Adolescente.aniversariantes_proximos())
-    ranking_genero = ranking_por_genero_de_lista(ranking_visivel)
-    lideres_mais_ativos = filtrar_lideres_ativos_por_permissao(Pontuacao.ranking_lideres_mais_ativos())
-    return render_template(
-        "dashboard.html",
-        resumo=resumo,
-        aniversariantes=aniversariantes,
-        ranking_genero=ranking_genero,
-        lideres_mais_ativos=lideres_mais_ativos,
-    )
+    return redirect(url_for("listar_adolescentes"))
 
 
 @app.route("/adolescentes")
 @login_obrigatorio
 def listar_adolescentes():
     busca = normalizar_texto(request.args.get("busca", ""))
-    lider_ga = normalizar_texto(request.args.get("lider_ga", ""))
-    sexo = request.args.get("sexo", "").strip()
-
-    if not usuario_master():
-        lider_ga = obter_lider_ga_usuario()
-        if not lider_ga:
-            flash("Seu usuário ainda não tem GA definido. Peça ao master para vincular seu GA.", "warning")
-            return render_template(
-                "adolescentes/lista.html",
-                adolescentes=[],
-                lideres=[],
-                filtros={"busca": busca, "lider_ga": "", "sexo": sexo},
-            )
-
-    adolescentes_raw = Adolescente.listar_adolescentes(busca, lider_ga, sexo)
+    usuario_id = session.get("usuario_id")
+    lider_ga = obter_lider_ga_usuario()
+    if not lider_ga:
+        flash("Defina o nome do GA nas Configurações para começar.", "warning")
+    if usuario_master():
+        adolescentes_raw = Adolescente.listar_adolescentes(busca=busca)
+    else:
+        adolescentes_raw = Adolescente.listar_adolescentes(
+            busca=busca,
+            lider_id=usuario_id,
+        )
     adolescentes = []
+    pontuacao_por_id = {item["id"]: item for item in Pontuacao.ranking_geral()}
     for adolescente in adolescentes_raw:
         item = dict(adolescente)
         item["idade"] = idade_por_data_iso(item.get("nascimento"))
         item["aniversario_curto"] = aniversario_curto(item.get("nascimento"))
+        item["foto_path"] = item.get("foto_path", "")
+        pontuacao = pontuacao_por_id.get(item["id"], {})
+        item["pontuacao_total"] = pontuacao.get("total_pontos", 0)
+        item["cupons"] = pontuacao.get("cupons", 0)
         adolescentes.append(item)
-    lideres = Adolescente.listar_lideres_ga()
     return render_template(
         "adolescentes/lista.html",
         adolescentes=adolescentes,
-        lideres=lideres,
-        filtros={"busca": busca, "lider_ga": lider_ga, "sexo": sexo},
+        lideres=[],
+        filtros={"busca": busca, "lider_ga": lider_ga, "sexo": ""},
     )
 
 
 @app.route("/adolescentes/novo", methods=["GET", "POST"])
 @login_obrigatorio
 def novo_adolescente():
-    if not usuario_master() and not lider_ga_configurado():
-        flash("Seu usuário ainda não tem GA definido. Peça ao master para vincular seu GA.", "warning")
+    if not lider_ga_configurado():
+        flash("Defina o nome do GA nas Configurações para cadastrar adolescentes.", "warning")
         return redirect(url_for("listar_adolescentes"))
 
     if request.method == "POST":
         erro = validar_campos_adolescente(request.form)
+        foto_path = ""
+        if not erro:
+            foto_path = salvar_foto_adolescente(request.files.get("foto"), request.form.get("nome", "adolescente"))
+            if foto_path is None:
+                erro = "Foto inválida. Envie JPG, PNG ou WEBP."
+            elif not foto_path:
+                erro = "A foto do adolescente é obrigatória."
         if erro:
             flash(erro, "danger")
         else:
             dados = dict(request.form)
-            if not usuario_master():
-                dados["lider_ga"] = obter_lider_ga_usuario()
+            dados["lider_ga"] = obter_lider_ga_usuario()
+            dados["lider_id"] = session.get("usuario_id")
+            dados["foto_path"] = foto_path
             adolescente = Adolescente.cadastrar_adolescente(dados)
             registrar_auditoria(
                 "cadastro_adolescente",
@@ -1097,12 +1158,21 @@ def editar_adolescente(adolescente_id):
 
     if request.method == "POST":
         erro = validar_campos_adolescente(request.form)
+        foto_path = adolescente.get("foto_path", "")
+        nova_foto = request.files.get("foto")
+        if not erro and nova_foto and nova_foto.filename:
+            foto_salva = salvar_foto_adolescente(nova_foto, request.form.get("nome", adolescente["nome"]))
+            if foto_salva is None:
+                erro = "Foto inválida. Envie JPG, PNG ou WEBP."
+            else:
+                foto_path = foto_salva
         if erro:
             flash(erro, "danger")
         else:
             dados = dict(request.form)
-            if not usuario_master():
-                dados["lider_ga"] = obter_lider_ga_usuario()
+            dados["lider_ga"] = adolescente["lider_ga"] if usuario_master() else obter_lider_ga_usuario()
+            dados["lider_id"] = adolescente.get("lider_id") or session.get("usuario_id")
+            dados["foto_path"] = foto_path
             Adolescente.atualizar_adolescente(adolescente_id, dados)
             registrar_auditoria(
                 "edicao_adolescente",
@@ -1134,7 +1204,7 @@ def excluir_adolescente(adolescente_id):
     return redirect(url_for("listar_adolescentes"))
 
 
-@app.route("/adolescentes/<int:adolescente_id>")
+@app.route("/adolescentes/<int:adolescente_id>", methods=["GET", "POST"])
 @login_obrigatorio
 def detalhe_adolescente(adolescente_id):
     adolescente = obter_adolescente_com_permissao(adolescente_id)
@@ -1142,14 +1212,92 @@ def detalhe_adolescente(adolescente_id):
         flash("Adolescente não encontrado ou sem permissão de acesso.", "danger")
         return redirect(url_for("listar_adolescentes"))
 
-    cumprimentos = Atividade.listar_cumprimentos(adolescente_id)
-    ranking = {item["id"]: item for item in Pontuacao.ranking_geral()}
-    pontuacao = ranking.get(adolescente_id)
+    ids = mapear_atividades_fixas_ids()
+    datas_fase = [data for _, data in FASE1_SEMANAS]
+    apps_data = FASE1_SEMANAS[-1][1]
+
+    if request.method == "POST":
+        action = request.form.get("action", "").strip()
+        if action == "salvar_semana":
+            semana_data = request.form.get("semana_data", "").strip()
+            if semana_data not in DATAS_FASE1:
+                flash("Semana inválida para a fase atual.", "danger")
+                return redirect(url_for("detalhe_adolescente", adolescente_id=adolescente_id))
+
+            selecionados = {item.strip().upper() for item in request.form.getlist("itens")}
+            for codigo in ["P", "MV", "AB", "V"]:
+                atividade_id = ids.get(codigo)
+                if not atividade_id:
+                    continue
+                if codigo in selecionados:
+                    Atividade.upsert_cumprimento(
+                        {
+                            "adolescente_id": adolescente_id,
+                            "atividade_id": atividade_id,
+                            "data_cumprimento": semana_data,
+                            "cumpriu": "1",
+                            "falta_justificada": "0",
+                            "observacoes": "",
+                        },
+                    )
+                else:
+                    Atividade.excluir_cumprimento_por_chave(
+                        adolescente_id,
+                        atividade_id,
+                        semana_data,
+                    )
+            flash("Pontuação da semana atualizada.", "success")
+            return redirect(url_for("detalhe_adolescente", adolescente_id=adolescente_id))
+
+        if action == "salvar_apps":
+            atividade_apps_id = ids.get("APPS")
+            if not atividade_apps_id:
+                flash("Atividade APPS não encontrada.", "danger")
+                return redirect(url_for("detalhe_adolescente", adolescente_id=adolescente_id))
+            marcado = request.form.get("apps_marcado") == "1"
+            for data_ref in datas_fase:
+                Atividade.excluir_cumprimento_por_chave(
+                    adolescente_id,
+                    atividade_apps_id,
+                    data_ref,
+                )
+            if marcado:
+                Atividade.upsert_cumprimento(
+                    {
+                        "adolescente_id": adolescente_id,
+                        "atividade_id": atividade_apps_id,
+                        "data_cumprimento": apps_data,
+                        "cumpriu": "1",
+                        "falta_justificada": "0",
+                        "observacoes": "",
+                    },
+                    apps_id=atividade_apps_id,
+                )
+            flash("APPS atualizado com sucesso.", "success")
+            return redirect(url_for("detalhe_adolescente", adolescente_id=adolescente_id))
+
+    registros = Atividade.listar_cumprimentos_por_adolescente_datas(adolescente_id, datas_fase)
+    marcacoes_semana = {data: {"P": False, "MV": False, "AB": False, "V": False} for data in datas_fase}
+    apps_marcado = False
+    for registro in registros:
+        if not registro["cumpriu"]:
+            continue
+        atividade_id = registro["atividade_id"]
+        data_ref = registro["data_cumprimento"]
+        for codigo in ["P", "MV", "AB", "V"]:
+            if ids.get(codigo) == atividade_id and data_ref in marcacoes_semana:
+                marcacoes_semana[data_ref][codigo] = True
+        if ids.get("APPS") == atividade_id and data_ref in DATAS_FASE1:
+            apps_marcado = True
+
+    pontuacao = Pontuacao.resumo_adolescente(adolescente_id)
     return render_template(
         "adolescentes/detalhe.html",
         adolescente=adolescente,
-        cumprimentos=cumprimentos,
         pontuacao=pontuacao,
+        semanas_fase1=FASE1_SEMANAS,
+        marcacoes_semana=marcacoes_semana,
+        apps_marcado=apps_marcado,
     )
 
 
@@ -1535,12 +1683,9 @@ def excluir_cumprimento(cumprimento_id):
 @app.route("/ranking")
 @login_obrigatorio
 def ranking():
-    ranking_visivel = filtrar_ranking_por_permissao(Pontuacao.ranking_geral())
     return render_template(
         "ranking.html",
-        ranking=ranking_visivel,
-        ranking_genero=ranking_por_genero_de_lista(ranking_visivel),
-        lideres_mais_ativos=filtrar_lideres_ativos_por_permissao(Pontuacao.ranking_lideres_mais_ativos()),
+        ranking=Pontuacao.ranking_geral(),
     )
 
 

@@ -3,37 +3,38 @@
 {% block content %}
 <section class="page-head">
     <div>
-        <p class="section-tag">Cadastro</p>
+        <p class="section-tag">Meu GA</p>
         <h2>{% if adolescente %}Editar adolescente{% else %}Novo adolescente{% endif %}</h2>
     </div>
 </section>
 
 <section class="card">
-    <form method="post" class="form-grid two-cols">
+    <form method="post" enctype="multipart/form-data" class="form-grid two-cols">
         <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
-        <label>
-            Nome
+        <label class="full-span">
+            Foto do adolescente {% if not adolescente %}*{% endif %}
+            <input type="file" name="foto" accept=".jpg,.jpeg,.png,.webp" {% if not adolescente %}required{% endif %}>
+            <small class="field-help">Formatos: JPG, PNG ou WEBP.</small>
+        </label>
+        <label class="full-span">
+            Nome completo
             <input type="text" name="nome" maxlength="80" pattern="[A-Za-zÀ-ÿ' -]{3,80}" value="{{ adolescente.nome if adolescente else '' }}" required>
         </label>
         <label>
-            Data de nascimento
+            Data de aniversário
             <input type="date" name="nascimento" min="1950-01-01" max="{{ today }}" value="{{ adolescente.nascimento if adolescente else '' }}" required>
-        </label>
-        <label>
-            Contato
-            <input type="tel" name="contato" maxlength="15" placeholder="(92) 99999-9999" value="{{ adolescente.contato if adolescente else '' }}">
         </label>
         <label>
             Gênero
             <select name="sexo" required>
                 {% set sexo = adolescente.sexo if adolescente else '' %}
                 <option value="">Selecione</option>
-                <option value="M" {% if sexo == 'M' %}selected{% endif %}>Masculino</option>
                 <option value="F" {% if sexo == 'F' %}selected{% endif %}>Feminino</option>
+                <option value="M" {% if sexo == 'M' %}selected{% endif %}>Masculino</option>
             </select>
         </label>
         <label class="full-span">
-            Nome do Responsável
+            Nome do responsável
             <input
                 type="text"
                 name="responsavel"
@@ -44,12 +45,8 @@
             >
         </label>
         <label class="full-span">
-            Líder de GA
-            {% if usuario_master() %}
-            <input type="text" name="lider_ga" maxlength="80" pattern="[A-Za-zÀ-ÿ' -]{3,80}" value="{{ adolescente.lider_ga if adolescente else '' }}" required>
-            {% else %}
-            <input type="text" name="lider_ga" value="{{ session.get('usuario_lider_ga') }}" readonly required>
-            {% endif %}
+            Contato do responsável
+            <input type="tel" name="contato" maxlength="15" placeholder="(92) 99999-9999" value="{{ adolescente.contato if adolescente else '' }}" required>
         </label>
         <div class="form-actions">
             <button type="submit">{% if adolescente %}Salvar alterações{% else %}Cadastrar adolescente{% endif %}</button>

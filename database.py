@@ -42,7 +42,9 @@ def init_db():
                 """
                 CREATE TABLE IF NOT EXISTS adolescentes (
                     id SERIAL PRIMARY KEY,
+                    lider_id INTEGER REFERENCES usuarios(id) ON DELETE SET NULL,
                     matricula TEXT NOT NULL UNIQUE,
+                    foto_path TEXT,
                     nome TEXT NOT NULL,
                     nascimento TEXT NOT NULL,
                     contato TEXT,
@@ -106,6 +108,12 @@ def init_db():
             )
             cursor.execute(
                 """
+                CREATE INDEX IF NOT EXISTS idx_adolescentes_lider_id
+                ON adolescentes(lider_id)
+                """
+            )
+            cursor.execute(
+                """
                 CREATE INDEX IF NOT EXISTS idx_cumprimentos_adolescente
                 ON cumprimentos_tarefas(adolescente_id)
                 """
@@ -145,12 +153,21 @@ def init_db():
                 "ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS lider_ga TEXT"
             )
             cursor.execute(
+                "ALTER TABLE adolescentes ADD COLUMN IF NOT EXISTS lider_id INTEGER REFERENCES usuarios(id) ON DELETE SET NULL"
+            )
+            cursor.execute(
+                "ALTER TABLE adolescentes ADD COLUMN IF NOT EXISTS foto_path TEXT"
+            )
+            cursor.execute(
                 "ALTER TABLE cumprimentos_tarefas ADD COLUMN IF NOT EXISTS falta_justificada INTEGER NOT NULL DEFAULT 0"
             )
             cursor.execute(
                 """
-                UPDATE usuarios
-                SET lider_ga = ''
-                WHERE COALESCE(trim(lider_ga), '') <> ''
+                UPDATE adolescentes ad
+                SET lider_id = u.id
+                FROM usuarios u
+                WHERE ad.lider_id IS NULL
+                  AND COALESCE(trim(ad.lider_ga), '') <> ''
+                  AND lower(trim(ad.lider_ga)) = lower(trim(u.lider_ga))
                 """
             )
