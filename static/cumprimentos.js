@@ -5,23 +5,39 @@
     const adolescenteSelect = form.querySelector('select[name="adolescente_id"]');
     const dataInput = document.getElementById("novo-cumprimento-data");
     const aviso = document.getElementById("datas-presenca-bloqueadas");
+    const checkboxes = Array.from(form.querySelectorAll('input[name="atividade_ids"]'));
     const presencaId = Number(form.dataset.presencaId || "0");
-    const mapaDatas = JSON.parse(form.dataset.datasPresenca || "{}");
+    const appsId = Number(form.dataset.appsId || "0");
+    const mapaDatasPresenca = JSON.parse(form.dataset.datasPresenca || "{}");
+    const mapaDatasApps = JSON.parse(form.dataset.datasAppsLancadas || "{}");
+    const datasAppsFase = JSON.parse(form.dataset.datasAppsFase || "[]");
+    const appsWrapper = document.getElementById("apps-fase-data-wrapper");
+    const appsSelect = document.getElementById("apps-fase-data-select");
 
-    if (!adolescenteSelect || !dataInput || !aviso || !presencaId) return;
+    if (!adolescenteSelect || !dataInput || !aviso) return;
 
-    function presencaSelecionada() {
-        return Array.from(form.querySelectorAll('input[name="atividade_ids"]:checked'))
-            .some((item) => Number(item.value) === presencaId);
+    function atividadeSelecionada(atividadeId) {
+        if (!atividadeId) return false;
+        return checkboxes.some((item) => item.checked && Number(item.value) === atividadeId);
     }
 
-    function datasBloqueadasDoAdolescente() {
+    function datasPresencaDoAdolescente() {
         const id = adolescenteSelect.value || "";
-        return mapaDatas[id] || [];
+        return mapaDatasPresenca[id] || [];
     }
 
-    function atualizarAviso() {
-        const datas = datasBloqueadasDoAdolescente();
+    function datasAppsDoAdolescente() {
+        const id = adolescenteSelect.value || "";
+        return mapaDatasApps[id] || [];
+    }
+
+    function atualizarAvisoPresenca() {
+        if (!atividadeSelecionada(presencaId)) {
+            aviso.textContent = "";
+            return;
+        }
+
+        const datas = datasPresencaDoAdolescente();
         if (!datas.length) {
             aviso.textContent = "";
             return;
@@ -37,14 +53,43 @@
         aviso.textContent = `Datas de presença já lançadas para este adolescente: ${formatadas}.`;
     }
 
+    function controlarDatasApps() {
+        if (!appsWrapper || !appsSelect) return;
+
+        const datasUsadas = datasAppsDoAdolescente();
+        Array.from(appsSelect.options).forEach((option) => {
+            if (!option.value) return;
+            option.disabled = datasUsadas.includes(option.value);
+        });
+
+        if (!atividadeSelecionada(appsId)) {
+            appsWrapper.style.display = "none";
+            appsSelect.value = "";
+            return;
+        }
+
+        appsWrapper.style.display = "grid";
+        if (datasAppsFase.includes(dataInput.value)) {
+            appsSelect.value = dataInput.value;
+        } else if (appsSelect.value) {
+            dataInput.value = appsSelect.value;
+        } else {
+            const primeiraDisponivel = Array.from(appsSelect.options).find((option) => option.value && !option.disabled);
+            if (primeiraDisponivel) {
+                appsSelect.value = primeiraDisponivel.value;
+                dataInput.value = primeiraDisponivel.value;
+            }
+        }
+    }
+
     function validarDataPresenca() {
-        if (!presencaSelecionada()) {
+        if (!atividadeSelecionada(presencaId)) {
             dataInput.setCustomValidity("");
             return;
         }
 
         const dataSelecionada = dataInput.value;
-        const bloqueadas = datasBloqueadasDoAdolescente();
+        const bloqueadas = datasPresencaDoAdolescente();
 
         if (dataSelecionada && bloqueadas.includes(dataSelecionada)) {
             dataInput.setCustomValidity(
@@ -55,8 +100,25 @@
         }
     }
 
+    function validarDataApps() {
+        if (!atividadeSelecionada(appsId)) return true;
+        const dataSelecionada = dataInput.value;
+        if (!datasAppsFase.includes(dataSelecionada)) return false;
+        if (datasAppsDoAdolescente().includes(dataSelecionada)) return false;
+        return true;
+    }
+
     form.addEventListener("submit", function (event) {
         validarDataPresenca();
+        controlarDatasApps();
+
+        if (!validarDataApps()) {
+            event.preventDefault();
+            dataInput.setCustomValidity("Para lançar APPS, escolha uma das datas da fase 1.");
+            form.reportValidity();
+            return;
+        }
+
         if (!form.checkValidity()) {
             event.preventDefault();
             form.reportValidity();
@@ -64,14 +126,34 @@
     });
 
     adolescenteSelect.addEventListener("change", function () {
-        atualizarAviso();
+        atualizarAvisoPresenca();
         validarDataPresenca();
     });
 
-    dataInput.addEventListener("change", validarDataPresenca);
-    form.querySelectorAll('input[name="atividade_ids"]').forEach((checkbox) => {
-        checkbox.addEventListener("change", validarDataPresenca);
+    dataInput.addEventListener("change", function () {
+        validarDataPresenca();
+        if (appsSelect && atividadeSelecionada(appsId) && datasAppsFase.includes(dataInput.value)) {
+            appsSelect.value = dataInput.value;
+        }
     });
 
-    atualizarAviso();
+    if (appsSelect) {
+        appsSelect.addEventListener("change", function () {
+            if (appsSelect.value) {
+                dataInput.value = appsSelect.value;
+            }
+            dataInput.setCustomValidity("");
+        });
+    }
+
+    checkboxes.forEach((checkbox) => {
+        checkbox.addEventListener("change", function () {
+            atualizarAvisoPresenca();
+            validarDataPresenca();
+            controlarDatasApps();
+        });
+    });
+
+    atualizarAvisoPresenca();
+    controlarDatasApps();
 })();

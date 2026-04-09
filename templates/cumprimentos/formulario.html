@@ -70,6 +70,9 @@
         method="post"
         class="form-grid two-cols"
         data-presenca-id="{{ presenca_id or '' }}"
+        data-apps-id="{{ apps_id or '' }}"
+        data-datas-apps-fase='{{ datas_apps_fase | tojson }}'
+        data-datas-apps-lancadas='{{ datas_apps_por_adolescente | tojson }}'
         data-datas-presenca='{{ datas_presenca_por_adolescente | tojson }}'
     >
         <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
@@ -87,7 +90,7 @@
         <label>
             Data
             <input id="novo-cumprimento-data" type="date" name="data_cumprimento" value="{{ today }}" required>
-            <small class="field-help">Na 1ª fase do Top Teens, a atividade Presença só pode ser lançada nas datas: 15/03/2026, 22/03/2026, 29/03/2026 e 12/04/2026.</small>
+            <small class="field-help">A data escolhida é aplicada às atividades selecionadas no lançamento.</small>
             <small id="datas-presenca-bloqueadas" class="field-help"></small>
         </label>
         <label>
@@ -117,6 +120,16 @@
             </div>
             <small class="field-help">Selecione as atividades que deseja lançar para o adolescente nesta data.</small>
         </div>
+        <label id="apps-fase-data-wrapper" class="full-span" style="display: none;">
+            Dia do APPS (1ª fase)
+            <select id="apps-fase-data-select">
+                <option value="">Selecione uma data da fase</option>
+                {% for data_apps in datas_apps_fase %}
+                <option value="{{ data_apps }}">{{ data_apps }}</option>
+                {% endfor %}
+            </select>
+            <small class="field-help">Ao marcar APPS, selecione uma dessas datas: 2026-03-15, 2026-03-22, 2026-03-29, 2026-04-12. Datas já lançadas ficam bloqueadas para novo lançamento.</small>
+        </label>
         <label class="full-span">
             Observações
             <textarea name="observacoes" rows="4" maxlength="200" placeholder="Opcional. Esta observação será aplicada a todas as atividades selecionadas."></textarea>

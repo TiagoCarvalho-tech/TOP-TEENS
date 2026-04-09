@@ -11,12 +11,6 @@ def ranking_geral():
                 WHERE lower(nome) = lower('APPS')
                 LIMIT 1
             ),
-            atividade_presenca AS (
-                SELECT id, pontos
-                FROM atividades
-                WHERE lower(nome) = lower('Presença culto')
-                LIMIT 1
-            ),
             pontos_tarefas AS (
                 SELECT
                     ct.adolescente_id,
@@ -27,7 +21,7 @@ def ranking_geral():
                   AND ct.atividade_id <> COALESCE((SELECT id FROM atividade_apps), -1)
                 GROUP BY ct.adolescente_id
             ),
-            presenca_por_data AS (
+            apps_por_data AS (
                 SELECT
                     ct.adolescente_id,
                     ct.data_cumprimento,
@@ -38,28 +32,33 @@ def ranking_geral():
                         ORDER BY ct.id DESC
                     ) AS pos
                 FROM cumprimentos_tarefas ct
-                JOIN atividade_presenca ap ON ap.id = ct.atividade_id
+                JOIN atividade_apps aa ON aa.id = ct.atividade_id
                 WHERE ct.data_cumprimento IN ('2026-03-15', '2026-03-22', '2026-03-29', '2026-04-12')
             ),
-            presencas_fase AS (
+            apps_fase AS (
                 SELECT
                     adolescente_id,
                     COUNT(*) AS total_dias_lancados,
-                    SUM(CASE WHEN cumpriu = 1 OR falta_justificada = 1 THEN 1 ELSE 0 END) AS total_dias_validos
-                FROM presenca_por_data
+                    SUM(CASE WHEN cumpriu = 1 THEN 1 ELSE 0 END) AS total_presentes,
+                    SUM(CASE WHEN cumpriu = 0 THEN 1 ELSE 0 END) AS total_faltas,
+                    SUM(CASE WHEN cumpriu = 0 AND falta_justificada = 1 THEN 1 ELSE 0 END) AS total_faltas_justificadas,
+                    SUM(CASE WHEN cumpriu = 0 AND falta_justificada = 0 THEN 1 ELSE 0 END) AS total_faltas_nao_justificadas
+                FROM apps_por_data
                 WHERE pos = 1
                 GROUP BY adolescente_id
             ),
-            pontos_presenca_fase AS (
+            pontos_apps_fase AS (
                 SELECT
-                    pf.adolescente_id,
+                    af.adolescente_id,
                     CASE
-                        WHEN pf.total_dias_lancados = 4
-                             AND pf.total_dias_validos = 4
+                        WHEN af.total_dias_lancados = 4
+                             AND af.total_faltas_nao_justificadas = 0
+                             AND af.total_faltas <= 1
+                             AND af.total_faltas_justificadas <= 1
                         THEN COALESCE((SELECT pontos FROM atividade_apps), 10)
                         ELSE 0
                     END AS total_apps
-                FROM presencas_fase pf
+                FROM apps_fase af
             )
             SELECT
                 ad.id,
@@ -72,7 +71,7 @@ def ranking_geral():
                 COALESCE(pt.total_tarefas, 0) + COALESCE(pp.total_apps, 0) AS total_pontos
             FROM adolescentes ad
             LEFT JOIN pontos_tarefas pt ON pt.adolescente_id = ad.id
-            LEFT JOIN pontos_presenca_fase pp ON pp.adolescente_id = ad.id
+            LEFT JOIN pontos_apps_fase pp ON pp.adolescente_id = ad.id
             ORDER BY total_pontos DESC, ad.nome
             """
         ).fetchall()

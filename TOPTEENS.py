@@ -136,7 +136,7 @@ def popular_atividades_iniciais():
         ("Meditação e versículo", 10, "Cumprir meditação e versículo da fase"),
         ("Bíblia e anotação", 10, "Leitura bíblica com anotação"),
         ("Visitante", 1, "Levar um visitante"),
-        ("APPS", 10, "Pontuação de fase do APPS com regra de presença"),
+        ("APPS", 40, "Pontuação de fase do APPS com regra de presença"),
         ("Não cumpriu nenhuma atividade", 0, "Lançamento sem pontuação"),
     ]
     aliases = {
@@ -166,7 +166,7 @@ def popular_atividades_iniciais():
         # Só cria atividades que não existem. Não sobrescreve alterações feitas pelo usuário.
         for nome, pontos, descricao in atividades_padrao:
             atividade = connection.execute(
-                "SELECT id FROM atividades WHERE lower(nome) = lower(%s)",
+                "SELECT id FROM atividades WHERE lower(trim(nome)) = lower(%s)",
                 (nome,),
             ).fetchone()
             if atividade is None:
@@ -178,11 +178,20 @@ def popular_atividades_iniciais():
                     (nome, pontos, descricao),
                 )
 
+        # Garante APPS como atividade ativa e com 40 pontos no formulário.
+        connection.execute(
+            """
+            UPDATE atividades
+            SET pontos = 40, ativo = 1
+            WHERE lower(trim(nome)) = lower('APPS')
+            """
+        )
+
         # Mantém somente as atividades oficiais ativas.
         connection.execute(
             """
             UPDATE atividades
-            SET ativo = CASE WHEN lower(nome) = ANY(%s) THEN 1 ELSE 0 END
+            SET ativo = CASE WHEN lower(trim(nome)) = ANY(%s) THEN 1 ELSE 0 END
             """,
             (list(nomes_oficiais),),
         )
@@ -1039,8 +1048,12 @@ def listar_cumprimentos():
 @login_obrigatorio
 def novo_cumprimento():
     presenca_id = Atividade.obter_id_atividade_por_nome("Presença culto")
+    apps_id = Atividade.obter_id_atividade_por_nome("APPS")
     datas_presenca_por_adolescente = (
         Atividade.mapa_datas_lancadas_por_atividade(presenca_id) if presenca_id else {}
+    )
+    datas_apps_por_adolescente = (
+        Atividade.mapa_datas_lancadas_por_atividade(apps_id) if apps_id else {}
     )
 
     if request.method == "POST":
@@ -1053,15 +1066,35 @@ def novo_cumprimento():
         else:
             atividade_ids = [item for item in request.form.getlist("atividade_ids") if item.strip()]
             atividade_ids_int = {int(item) for item in atividade_ids}
-            if presenca_id and presenca_id in atividade_ids_int and not data_permitida_fase1_apps(request.form.get("data_cumprimento")):
-                flash("Na 1ª fase do Top Teens, a atividade Presença só pode ser lançada em 15/03/2026, 22/03/2026, 29/03/2026 ou 12/04/2026.", "danger")
+            if apps_id and apps_id in atividade_ids_int and not data_permitida_fase1_apps(request.form.get("data_cumprimento")):
+                flash("Na 1ª fase do Top Teens, a atividade APPS só pode ser lançada em 15/03/2026, 22/03/2026, 29/03/2026 ou 12/04/2026.", "danger")
                 return render_template(
                     "cumprimentos/formulario.html",
                     cumprimento=None,
                     adolescentes=adolescentes_disponiveis(),
-                    atividades=Atividade.listar_atividades(somente_ativas=True, incluir_apps=False),
+                    atividades=Atividade.listar_atividades(somente_ativas=True),
                     presenca_id=presenca_id,
+                    apps_id=apps_id,
+                    datas_apps_fase=sorted(DATAS_FASE1_APPS),
                     datas_presenca_por_adolescente=datas_presenca_por_adolescente,
+                    datas_apps_por_adolescente=datas_apps_por_adolescente,
+                )
+            if apps_id and apps_id in atividade_ids_int and Atividade.existe_cumprimento_no_dia(
+                adolescente["id"],
+                apps_id,
+                request.form.get("data_cumprimento", ""),
+            ):
+                flash("Esse adolescente já possui APPS lançado nessa data. Use a edição no histórico de cumprimentos.", "danger")
+                return render_template(
+                    "cumprimentos/formulario.html",
+                    cumprimento=None,
+                    adolescentes=adolescentes_disponiveis(),
+                    atividades=Atividade.listar_atividades(somente_ativas=True),
+                    presenca_id=presenca_id,
+                    apps_id=apps_id,
+                    datas_apps_fase=sorted(DATAS_FASE1_APPS),
+                    datas_presenca_por_adolescente=datas_presenca_por_adolescente,
+                    datas_apps_por_adolescente=datas_apps_por_adolescente,
                 )
             if presenca_id and presenca_id in atividade_ids_int and Atividade.existe_cumprimento_no_dia(
                 adolescente["id"],
@@ -1073,9 +1106,12 @@ def novo_cumprimento():
                     "cumprimentos/formulario.html",
                     cumprimento=None,
                     adolescentes=adolescentes_disponiveis(),
-                    atividades=Atividade.listar_atividades(somente_ativas=True, incluir_apps=False),
+                    atividades=Atividade.listar_atividades(somente_ativas=True),
                     presenca_id=presenca_id,
+                    apps_id=apps_id,
+                    datas_apps_fase=sorted(DATAS_FASE1_APPS),
                     datas_presenca_por_adolescente=datas_presenca_por_adolescente,
+                    datas_apps_por_adolescente=datas_apps_por_adolescente,
                 )
 
             registros = Atividade.registrar_cumprimentos_em_lote(request.form, atividade_ids, presenca_id=presenca_id)
@@ -1093,9 +1129,12 @@ def novo_cumprimento():
         "cumprimentos/formulario.html",
         cumprimento=None,
         adolescentes=adolescentes_disponiveis(),
-        atividades=Atividade.listar_atividades(somente_ativas=True, incluir_apps=False),
+        atividades=Atividade.listar_atividades(somente_ativas=True),
         presenca_id=presenca_id,
+        apps_id=apps_id,
+        datas_apps_fase=sorted(DATAS_FASE1_APPS),
         datas_presenca_por_adolescente=datas_presenca_por_adolescente,
+        datas_apps_por_adolescente=datas_apps_por_adolescente,
     )
 
 
@@ -1113,6 +1152,9 @@ def editar_cumprimento(cumprimento_id):
     datas_presenca_por_adolescente = (
         Atividade.mapa_datas_lancadas_por_atividade(presenca_id) if presenca_id else {}
     )
+    datas_apps_por_adolescente = (
+        Atividade.mapa_datas_lancadas_por_atividade(atividade_apps_id) if atividade_apps_id else {}
+    )
 
     if request.method == "POST":
         erro = validar_campos_cumprimento(request.form)
@@ -1121,8 +1163,15 @@ def editar_cumprimento(cumprimento_id):
             flash(erro, "danger")
         elif adolescente is None:
             flash("Você não tem permissão para lançar tarefa para este adolescente.", "danger")
-        elif presenca_id and request.form.get("atividade_id", "").isdigit() and int(request.form["atividade_id"]) == presenca_id and not data_permitida_fase1_apps(request.form.get("data_cumprimento")):
-            flash("Na 1ª fase do Top Teens, a atividade Presença só pode ser lançada em 15/03/2026, 22/03/2026, 29/03/2026 ou 12/04/2026.", "danger")
+        elif atividade_apps_id and request.form.get("atividade_id", "").isdigit() and int(request.form["atividade_id"]) == atividade_apps_id and not data_permitida_fase1_apps(request.form.get("data_cumprimento")):
+            flash("Na 1ª fase do Top Teens, a atividade APPS só pode ser lançada em 15/03/2026, 22/03/2026, 29/03/2026 ou 12/04/2026.", "danger")
+        elif atividade_apps_id and request.form.get("atividade_id", "").isdigit() and int(request.form["atividade_id"]) == atividade_apps_id and Atividade.existe_cumprimento_no_dia(
+            request.form.get("adolescente_id"),
+            atividade_apps_id,
+            request.form.get("data_cumprimento", ""),
+            excluir_id=cumprimento_id,
+        ):
+            flash("Esse adolescente já possui APPS lançado nessa data. Use o registro já existente.", "danger")
         elif presenca_id and request.form.get("atividade_id", "").isdigit() and int(request.form["atividade_id"]) == presenca_id and Atividade.existe_cumprimento_no_dia(
             request.form.get("adolescente_id"),
             presenca_id,
@@ -1147,7 +1196,10 @@ def editar_cumprimento(cumprimento_id):
         adolescentes=adolescentes_disponiveis(),
         atividades=Atividade.listar_atividades(somente_ativas=True, incluir_apps=incluir_apps),
         presenca_id=presenca_id,
+        apps_id=atividade_apps_id,
+        datas_apps_fase=sorted(DATAS_FASE1_APPS),
         datas_presenca_por_adolescente=datas_presenca_por_adolescente,
+        datas_apps_por_adolescente=datas_apps_por_adolescente,
     )
 
 

@@ -79,7 +79,7 @@ def obter_id_atividade_por_nome(nome):
             """
             SELECT id
             FROM atividades
-            WHERE lower(nome) = lower(%s)
+            WHERE lower(trim(nome)) = lower(%s)
             LIMIT 1
             """,
             (nome,),
