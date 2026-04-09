@@ -152,6 +152,41 @@ def listar_cumprimentos(adolescente_id=None):
         ).fetchall()
 
 
+def listar_cumprimentos_por_adolescente_datas(adolescente_id, datas):
+    if not datas:
+        return []
+
+    placeholders = ", ".join(["%s"] * len(datas))
+    parametros = [int(adolescente_id), *datas]
+    with get_connection() as connection:
+        return connection.execute(
+            f"""
+            SELECT *
+            FROM cumprimentos_tarefas
+            WHERE adolescente_id = %s
+              AND data_cumprimento IN ({placeholders})
+            ORDER BY data_cumprimento, atividade_id, id
+            """,
+            parametros,
+        ).fetchall()
+
+
+def obter_cumprimento_por_chave(adolescente_id, atividade_id, data_cumprimento):
+    with get_connection() as connection:
+        return connection.execute(
+            """
+            SELECT *
+            FROM cumprimentos_tarefas
+            WHERE adolescente_id = %s
+              AND atividade_id = %s
+              AND data_cumprimento = %s
+            ORDER BY id DESC
+            LIMIT 1
+            """,
+            (int(adolescente_id), int(atividade_id), data_cumprimento),
+        ).fetchone()
+
+
 def obter_cumprimento(cumprimento_id):
     with get_connection() as connection:
         return connection.execute(
@@ -190,6 +225,23 @@ def registrar_cumprimento(dados, presenca_id=None, apps_id=None):
                 falta_justificada,
             ),
         ).fetchone()
+
+
+def upsert_cumprimento(dados, presenca_id=None, apps_id=None):
+    existente = obter_cumprimento_por_chave(
+        dados["adolescente_id"],
+        dados["atividade_id"],
+        dados["data_cumprimento"],
+    )
+    if existente:
+        atualizar_cumprimento(
+            existente["id"],
+            dados,
+            presenca_id=presenca_id,
+            apps_id=apps_id,
+        )
+        return {"id": existente["id"], "atividade_id": int(dados["atividade_id"])}
+    return registrar_cumprimento(dados, presenca_id=presenca_id, apps_id=apps_id)
 
 
 def registrar_cumprimentos_em_lote(dados, atividade_ids, presenca_id=None):

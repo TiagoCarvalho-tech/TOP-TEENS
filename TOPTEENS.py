@@ -44,6 +44,18 @@ DATAS_FASE1_APPS = {
     "2026-03-29",
     "2026-04-12",
 }
+FASE1_SEMANAS = [
+    ("Semana 1", "2026-03-15"),
+    ("Semana 2", "2026-03-22"),
+    ("Semana 3", "2026-03-29"),
+    ("Semana 4", "2026-04-12"),
+]
+ATIVIDADES_SEMANA_FASE1 = [
+    "Presença culto",
+    "Meditação e versículo",
+    "Bíblia e anotação",
+    "Visitante",
+]
 
 
 def login_obrigatorio(view):
@@ -92,12 +104,41 @@ def normalizar_texto(texto):
     return re.sub(r"\s+", " ", (texto or "").strip())
 
 
+def idade_por_data_iso(data_iso):
+    if not data_iso:
+        return None
+    try:
+        nascimento = datetime.strptime(data_iso, "%Y-%m-%d").date()
+    except ValueError:
+        return None
+
+    hoje = date.today()
+    idade = hoje.year - nascimento.year
+    if (hoje.month, hoje.day) < (nascimento.month, nascimento.day):
+        idade -= 1
+    return idade
+
+
+def aniversario_curto(data_iso):
+    if not data_iso:
+        return "-"
+    try:
+        nascimento = datetime.strptime(data_iso, "%Y-%m-%d").date()
+    except ValueError:
+        return "-"
+    return nascimento.strftime("%d/%m")
+
+
 def somente_letras_espacos(texto):
     return bool(re.fullmatch(r"[A-Za-zÀ-ÿ' -]+", texto))
 
 
 def obter_lider_ga_usuario():
     return normalizar_texto(session.get("usuario_lider_ga", ""))
+
+
+def lider_ga_configurado():
+    return bool(obter_lider_ga_usuario())
 
 
 def data_permitida_fase1_apps(valor_data):
@@ -403,11 +444,23 @@ def validar_cadastro_usuario(formulario):
 
 
 def usuario_pode_acessar_adolescente(adolescente):
-    return adolescente is not None
+    if adolescente is None:
+        return False
+    if usuario_master():
+        return True
+    lider_ga = obter_lider_ga_usuario()
+    if not lider_ga:
+        return False
+    return adolescente["lider_ga"] == lider_ga
 
 
 def adolescentes_disponiveis():
-    return Adolescente.listar_adolescentes()
+    if usuario_master():
+        return Adolescente.listar_adolescentes()
+    lider_ga = obter_lider_ga_usuario()
+    if not lider_ga:
+        return []
+    return Adolescente.listar_adolescentes(lider_ga=lider_ga)
 
 
 def obter_adolescente_com_permissao(adolescente_id):
@@ -422,6 +475,102 @@ def verificar_adolescente_do_formulario():
     if not adolescente_id.isdigit():
         return None
     return obter_adolescente_com_permissao(int(adolescente_id))
+
+
+def atividades_semana_fase1():
+    ordem = {nome: indice for indice, nome in enumerate(ATIVIDADES_SEMANA_FASE1)}
+    atividades = Atividade.listar_atividades(somente_ativas=True)
+    filtradas = [item for item in atividades if item["nome"] in ATIVIDADES_SEMANA_FASE1]
+    filtradas.sort(key=lambda item: ordem.get(item["nome"], 99))
+    return filtradas
+
+
+def montar_contexto_lancamento_fase1(adolescente_id=None):
+    adolescentes = adolescentes_disponiveis()
+    adolescente_selecionado = None
+    semanas = [{"nome": nome, "data": data} for nome, data in FASE1_SEMANAS]
+    datas_fase = [item["data"] for item in semanas]
+    semana_atividades = atividades_semana_fase1()
+    pontos_atividade = {item["id"]: item["pontos"] for item in semana_atividades}
+    apps_atividade = Atividade.obter_id_atividade_por_nome("APPS")
+    semana_marcacoes = {item["data"]: set() for item in semanas}
+    pontos_por_semana = {item["data"]: 0 for item in semanas}
+    apps_marcacoes = {}
+    pontuacao_adolescente = None
+
+    if adolescente_id:
+        adolescente_selecionado = next((item for item in adolescentes if item["id"] == adolescente_id), None)
+        if adolescente_selecionado:
+            registros = Atividade.listar_cumprimentos_por_adolescente_datas(adolescente_id, datas_fase)
+            for registro in registros:
+                data_cumprimento = registro["data_cumprimento"]
+                if apps_atividade and registro["atividade_id"] == apps_atividade:
+                    if data_cumprimento not in apps_marcacoes or registro["id"] > apps_marcacoes[data_cumprimento]["id"]:
+                        apps_marcacoes[data_cumprimento] = registro
+                elif registro["cumpriu"] and data_cumprimento in semana_marcacoes:
+                    semana_marcacoes[data_cumprimento].add(registro["atividade_id"])
+
+            for data_ref, marcadas in semana_marcacoes.items():
+                pontos_por_semana[data_ref] = sum(
+                    pontos_atividade.get(atividade_id, 0) for atividade_id in marcadas
+                )
+
+            mapa_ranking = {item["id"]: item for item in Pontuacao.ranking_geral()}
+            pontuacao_adolescente = mapa_ranking.get(adolescente_id)
+
+    return {
+        "adolescentes": adolescentes,
+        "adolescente_selecionado": adolescente_selecionado,
+        "semanas_fase1": semanas,
+        "semana_atividades": semana_atividades,
+        "apps_id": apps_atividade,
+        "semana_marcacoes": semana_marcacoes,
+        "pontos_por_semana": pontos_por_semana,
+        "apps_marcacoes": apps_marcacoes,
+        "pontuacao_adolescente": pontuacao_adolescente,
+    }
+
+
+def filtrar_ranking_por_permissao(ranking):
+    if usuario_master():
+        return list(ranking)
+    lider_ga = obter_lider_ga_usuario()
+    if not lider_ga:
+        return []
+    return [item for item in ranking if item["lider_ga"] == lider_ga]
+
+
+def ranking_por_genero_de_lista(ranking):
+    resultado = {"M": [], "F": []}
+    for item in ranking:
+        if item["sexo"] in resultado:
+            resultado[item["sexo"]].append(item)
+    return resultado
+
+
+def filtrar_aniversariantes_por_permissao(aniversariantes):
+    if usuario_master():
+        return list(aniversariantes)
+    lider_ga = obter_lider_ga_usuario()
+    if not lider_ga:
+        return []
+    return [item for item in aniversariantes if item["lider_ga"] == lider_ga]
+
+
+def filtrar_lideres_ativos_por_permissao(lista_lideres_ativos):
+    if usuario_master():
+        return list(lista_lideres_ativos)
+    usuario_logado = session.get("usuario_id")
+    return [item for item in lista_lideres_ativos if item["id"] == usuario_logado]
+
+
+def montar_resumo_dashboard(ranking):
+    return {
+        "total_adolescentes": len(ranking),
+        "total_pontos": sum(item["total_pontos"] for item in ranking),
+        "lideres_ga": sorted({item["lider_ga"] for item in ranking if item["lider_ga"]}),
+        "top_5": ranking[:5],
+    }
 
 
 def registrar_sessao(usuario):
@@ -755,6 +904,41 @@ def remover_master(usuario_id):
     return redirect(url_for("usuarios_aprovacoes"))
 
 
+@app.route("/usuarios/<int:usuario_id>/definir-ga", methods=["POST"])
+@master_obrigatorio
+def definir_ga_usuario(usuario_id):
+    ga = normalizar_texto(request.form.get("lider_ga", ""))
+    erro = validar_lider_ga(ga)
+    if erro:
+        flash(erro, "danger")
+        return redirect(url_for("usuarios_aprovacoes"))
+
+    with get_connection() as connection:
+        usuario = connection.execute(
+            "SELECT * FROM usuarios WHERE id = %s AND aprovado = 1",
+            (usuario_id,),
+        ).fetchone()
+        if usuario is None:
+            flash("Usuário não encontrado.", "danger")
+            return redirect(url_for("usuarios_aprovacoes"))
+
+        connection.execute(
+            """
+            UPDATE usuarios
+            SET lider_ga = %s
+            WHERE id = %s
+            """,
+            (ga, usuario_id),
+        )
+
+    if session.get("usuario_id") == usuario_id:
+        session["usuario_lider_ga"] = ga
+
+    registrar_auditoria("definicao_ga_usuario", "usuario", usuario_id, f"GA definido como {ga}.")
+    flash("GA do usuário atualizado com sucesso.", "success")
+    return redirect(url_for("usuarios_aprovacoes"))
+
+
 @app.route("/seguranca/senha", methods=["GET", "POST"])
 @login_obrigatorio
 def alterar_senha():
@@ -828,10 +1012,11 @@ def editar_meu_cadastro():
 @app.route("/dashboard")
 @login_obrigatorio
 def dashboard():
-    resumo = Pontuacao.resumo_dashboard()
-    aniversariantes = Adolescente.aniversariantes_proximos()
-    ranking_genero = Pontuacao.ranking_por_sexo()
-    lideres_mais_ativos = Pontuacao.ranking_lideres_mais_ativos()
+    ranking_visivel = filtrar_ranking_por_permissao(Pontuacao.ranking_geral())
+    resumo = montar_resumo_dashboard(ranking_visivel)
+    aniversariantes = filtrar_aniversariantes_por_permissao(Adolescente.aniversariantes_proximos())
+    ranking_genero = ranking_por_genero_de_lista(ranking_visivel)
+    lideres_mais_ativos = filtrar_lideres_ativos_por_permissao(Pontuacao.ranking_lideres_mais_ativos())
     return render_template(
         "dashboard.html",
         resumo=resumo,
@@ -848,7 +1033,24 @@ def listar_adolescentes():
     lider_ga = normalizar_texto(request.args.get("lider_ga", ""))
     sexo = request.args.get("sexo", "").strip()
 
-    adolescentes = Adolescente.listar_adolescentes(busca, lider_ga, sexo)
+    if not usuario_master():
+        lider_ga = obter_lider_ga_usuario()
+        if not lider_ga:
+            flash("Seu usuário ainda não tem GA definido. Peça ao master para vincular seu GA.", "warning")
+            return render_template(
+                "adolescentes/lista.html",
+                adolescentes=[],
+                lideres=[],
+                filtros={"busca": busca, "lider_ga": "", "sexo": sexo},
+            )
+
+    adolescentes_raw = Adolescente.listar_adolescentes(busca, lider_ga, sexo)
+    adolescentes = []
+    for adolescente in adolescentes_raw:
+        item = dict(adolescente)
+        item["idade"] = idade_por_data_iso(item.get("nascimento"))
+        item["aniversario_curto"] = aniversario_curto(item.get("nascimento"))
+        adolescentes.append(item)
     lideres = Adolescente.listar_lideres_ga()
     return render_template(
         "adolescentes/lista.html",
@@ -861,12 +1063,18 @@ def listar_adolescentes():
 @app.route("/adolescentes/novo", methods=["GET", "POST"])
 @login_obrigatorio
 def novo_adolescente():
+    if not usuario_master() and not lider_ga_configurado():
+        flash("Seu usuário ainda não tem GA definido. Peça ao master para vincular seu GA.", "warning")
+        return redirect(url_for("listar_adolescentes"))
+
     if request.method == "POST":
         erro = validar_campos_adolescente(request.form)
         if erro:
             flash(erro, "danger")
         else:
             dados = dict(request.form)
+            if not usuario_master():
+                dados["lider_ga"] = obter_lider_ga_usuario()
             adolescente = Adolescente.cadastrar_adolescente(dados)
             registrar_auditoria(
                 "cadastro_adolescente",
@@ -893,6 +1101,8 @@ def editar_adolescente(adolescente_id):
             flash(erro, "danger")
         else:
             dados = dict(request.form)
+            if not usuario_master():
+                dados["lider_ga"] = obter_lider_ga_usuario()
             Adolescente.atualizar_adolescente(adolescente_id, dados)
             registrar_auditoria(
                 "edicao_adolescente",
@@ -1061,105 +1271,119 @@ def listar_cumprimentos():
 @app.route("/cumprimentos/novo", methods=["GET", "POST"])
 @login_obrigatorio
 def novo_cumprimento():
-    presenca_id = Atividade.obter_id_atividade_por_nome("Presença culto")
-    apps_id = Atividade.obter_id_atividade_por_nome("APPS")
-    datas_presenca_por_adolescente = (
-        Atividade.mapa_datas_lancadas_por_atividade(presenca_id) if presenca_id else {}
-    )
-    datas_apps_por_adolescente = (
-        Atividade.mapa_datas_lancadas_por_atividade(apps_id) if apps_id else {}
-    )
+    adolescente_id_param = request.args.get("adolescente_id", "").strip()
+    adolescente_id = int(adolescente_id_param) if adolescente_id_param.isdigit() else None
+    contexto = montar_contexto_lancamento_fase1(adolescente_id=adolescente_id)
 
     if request.method == "POST":
-        erro = validar_campos_cumprimento_lote(request.form)
         adolescente = verificar_adolescente_do_formulario()
-        if erro:
-            flash(erro, "danger")
-        elif adolescente is None:
-            flash("Você não tem permissão para lançar tarefa para este adolescente.", "danger")
-        else:
-            atividade_ids = [item for item in request.form.getlist("atividade_ids") if item.strip()]
-            atividade_ids_int = {int(item) for item in atividade_ids}
-            apps_data = request.form.get("apps_data_cumprimento", "")
-            if apps_id and apps_id in atividade_ids_int and Atividade.existe_cumprimento_no_dia(
-                adolescente["id"],
-                apps_id,
-                apps_data,
-            ):
-                flash("Esse adolescente já possui APPS lançado nessa data. Use a edição no histórico de cumprimentos.", "danger")
-                return render_template(
-                    "cumprimentos/formulario.html",
-                    cumprimento=None,
-                    adolescentes=adolescentes_disponiveis(),
-                    atividades=Atividade.listar_atividades(somente_ativas=True),
-                    presenca_id=presenca_id,
-                    apps_id=apps_id,
-                    datas_apps_fase=sorted(DATAS_FASE1_APPS),
-                    datas_presenca_por_adolescente=datas_presenca_por_adolescente,
-                    datas_apps_por_adolescente=datas_apps_por_adolescente,
-                )
-            if presenca_id and presenca_id in atividade_ids_int and Atividade.existe_cumprimento_no_dia(
-                adolescente["id"],
-                presenca_id,
-                request.form.get("data_cumprimento", ""),
-            ):
-                flash("Esse adolescente já possui presença lançada nessa data. Edite o registro existente.", "danger")
-                return render_template(
-                    "cumprimentos/formulario.html",
-                    cumprimento=None,
-                    adolescentes=adolescentes_disponiveis(),
-                    atividades=Atividade.listar_atividades(somente_ativas=True),
-                    presenca_id=presenca_id,
-                    apps_id=apps_id,
-                    datas_apps_fase=sorted(DATAS_FASE1_APPS),
-                    datas_presenca_por_adolescente=datas_presenca_por_adolescente,
-                    datas_apps_por_adolescente=datas_apps_por_adolescente,
-                )
+        if adolescente is None:
+            flash("Você não tem permissão para lançar tarefas para este adolescente.", "danger")
+            return redirect(url_for("novo_cumprimento"))
 
-            atividade_nao_cumpriu_id = Atividade.obter_id_atividade_por_nome("Não cumpriu nenhuma atividade")
+        adolescente_id = adolescente["id"]
+        action = request.form.get("action", "").strip()
+        apps_id = contexto["apps_id"]
+        atividades_semana = {item["id"] for item in contexto["semana_atividades"]}
+        datas_fase = {data for _, data in FASE1_SEMANAS}
+
+        if action == "salvar_semana":
+            semana_data = request.form.get("semana_data", "").strip()
+            if semana_data not in datas_fase:
+                flash("Data de semana inválida para a fase 1.", "danger")
+                return redirect(url_for("novo_cumprimento", adolescente_id=adolescente_id))
+
+            ids_selecionados = {
+                int(item)
+                for item in request.form.getlist("atividade_ids")
+                if item.isdigit()
+            }
+            ids_validos = ids_selecionados.intersection(atividades_semana)
+            if not ids_validos:
+                flash("Selecione ao menos uma atividade para salvar na semana.", "warning")
+                return redirect(url_for("novo_cumprimento", adolescente_id=adolescente_id))
+
             registros = []
-            for atividade_id in atividade_ids_int:
-                dados_item = {
-                    "adolescente_id": adolescente["id"],
-                    "atividade_id": atividade_id,
-                    "observacoes": request.form.get("observacoes", ""),
-                }
-
-                if apps_id and atividade_id == apps_id:
-                    dados_item["data_cumprimento"] = apps_data
-                    dados_item["cumpriu"] = request.form.get("apps_cumpriu", "1")
-                    dados_item["falta_justificada"] = request.form.get("apps_falta_justificada", "0")
-                else:
-                    dados_item["data_cumprimento"] = request.form.get("data_cumprimento", "")
-                    dados_item["cumpriu"] = "0" if atividade_nao_cumpriu_id and atividade_id == atividade_nao_cumpriu_id else "1"
-                    dados_item["falta_justificada"] = "0"
-
-                registro = Atividade.registrar_cumprimento(
-                    dados_item,
-                    presenca_id=presenca_id,
+            for atividade_id in ids_validos:
+                registro = Atividade.upsert_cumprimento(
+                    {
+                        "adolescente_id": adolescente_id,
+                        "atividade_id": atividade_id,
+                        "data_cumprimento": semana_data,
+                        "cumpriu": "1",
+                        "falta_justificada": "0",
+                        "observacoes": "",
+                    },
                     apps_id=apps_id,
                 )
                 registros.append(registro)
+
             for registro in registros:
                 registrar_auditoria(
                     "lancamento_cumprimento",
                     "cumprimento",
                     registro["id"],
-                    f"Lançamento para {adolescente['nome']}.",
+                    f"Lançamento semanal para {adolescente['nome']}.",
                 )
-            flash(f"{len(atividade_ids)} atividade(s) registrada(s) com sucesso.", "success")
-            return redirect(url_for("listar_cumprimentos"))
+            flash("Semana salva com sucesso. Você pode voltar e adicionar atividades esquecidas quando precisar.", "success")
+            return redirect(url_for("novo_cumprimento", adolescente_id=adolescente_id))
+
+        if action == "salvar_apps":
+            if not apps_id:
+                flash("Atividade APPS não encontrada.", "danger")
+                return redirect(url_for("novo_cumprimento", adolescente_id=adolescente_id))
+
+            registros = []
+            for _, data_apps in FASE1_SEMANAS:
+                if request.form.get(f"apps_lancar_{data_apps}") != "1":
+                    continue
+
+                cumpriu = request.form.get(f"apps_cumpriu_{data_apps}", "1")
+                falta_justificada = request.form.get(f"apps_falta_justificada_{data_apps}", "0")
+                if cumpriu not in {"0", "1"}:
+                    continue
+
+                if Atividade.existe_cumprimento_no_dia(adolescente_id, apps_id, data_apps):
+                    flash(
+                        f"O APPS de {data_apps} já foi lançado. Edite no histórico de cumprimentos.",
+                        "warning",
+                    )
+                    continue
+
+                registro = Atividade.registrar_cumprimento(
+                    {
+                        "adolescente_id": adolescente_id,
+                        "atividade_id": apps_id,
+                        "data_cumprimento": data_apps,
+                        "cumpriu": cumpriu,
+                        "falta_justificada": falta_justificada,
+                        "observacoes": "",
+                    },
+                    apps_id=apps_id,
+                )
+                registros.append(registro)
+
+            for registro in registros:
+                registrar_auditoria(
+                    "lancamento_cumprimento",
+                    "cumprimento",
+                    registro["id"],
+                    f"Lançamento APPS para {adolescente['nome']}.",
+                )
+            if registros:
+                flash("Lançamentos de APPS processados.", "success")
+            else:
+                flash("Nenhum lançamento novo de APPS foi salvo.", "warning")
+            return redirect(url_for("novo_cumprimento", adolescente_id=adolescente_id))
+
+        flash("Ação de lançamento inválida.", "danger")
+        return redirect(url_for("novo_cumprimento", adolescente_id=adolescente_id))
 
     return render_template(
         "cumprimentos/formulario.html",
         cumprimento=None,
-        adolescentes=adolescentes_disponiveis(),
-        atividades=Atividade.listar_atividades(somente_ativas=True),
-        presenca_id=presenca_id,
-        apps_id=apps_id,
-        datas_apps_fase=sorted(DATAS_FASE1_APPS),
-        datas_presenca_por_adolescente=datas_presenca_por_adolescente,
-        datas_apps_por_adolescente=datas_apps_por_adolescente,
+        adolescente_id=adolescente_id,
+        **contexto,
     )
 
 
@@ -1180,45 +1404,100 @@ def editar_cumprimento(cumprimento_id):
     datas_apps_por_adolescente = (
         Atividade.mapa_datas_lancadas_por_atividade(atividade_apps_id) if atividade_apps_id else {}
     )
+    atividades_semana = atividades_semana_fase1()
+    ids_atividades_semana = {item["id"] for item in atividades_semana}
+    datas_fase1 = {item[1] for item in FASE1_SEMANAS}
+    registros_mesma_data = Atividade.listar_cumprimentos_por_adolescente_datas(
+        cumprimento["adolescente_id"], [cumprimento["data_cumprimento"]]
+    )
+    atividades_ja_lancadas_na_data = {item["atividade_id"] for item in registros_mesma_data}
+    atividades_adicionaveis = [
+        item for item in atividades_semana if item["id"] not in atividades_ja_lancadas_na_data
+    ]
+    mostrar_adicao_na_edicao = cumprimento["data_cumprimento"] in datas_fase1 and bool(atividades_adicionaveis)
 
     if request.method == "POST":
-        erro = validar_campos_cumprimento(request.form)
-        adolescente = verificar_adolescente_do_formulario()
-        if erro:
-            flash(erro, "danger")
-        elif adolescente is None:
-            flash("Você não tem permissão para lançar tarefa para este adolescente.", "danger")
-        elif atividade_apps_id and request.form.get("atividade_id", "").isdigit() and int(request.form["atividade_id"]) == atividade_apps_id and not data_permitida_fase1_apps(request.form.get("data_cumprimento")):
-            flash("Na 1ª fase do Top Teens, a atividade APPS só pode ser lançada em 15/03/2026, 22/03/2026, 29/03/2026 ou 12/04/2026.", "danger")
-        elif atividade_apps_id and request.form.get("atividade_id", "").isdigit() and int(request.form["atividade_id"]) == atividade_apps_id and Atividade.existe_cumprimento_no_dia(
-            request.form.get("adolescente_id"),
-            atividade_apps_id,
-            request.form.get("data_cumprimento", ""),
-            excluir_id=cumprimento_id,
-        ):
-            flash("Esse adolescente já possui APPS lançado nessa data. Use o registro já existente.", "danger")
-        elif presenca_id and request.form.get("atividade_id", "").isdigit() and int(request.form["atividade_id"]) == presenca_id and Atividade.existe_cumprimento_no_dia(
-            request.form.get("adolescente_id"),
-            presenca_id,
-            request.form.get("data_cumprimento", ""),
-            excluir_id=cumprimento_id,
-        ):
-            flash("Esse adolescente já possui presença lançada nessa data. Edite o registro existente.", "danger")
+        action = request.form.get("action", "salvar_cumprimento").strip()
+        if action == "adicionar_atividade_semana":
+            adolescente = verificar_adolescente_do_formulario()
+            if adolescente is None or adolescente["id"] != cumprimento["adolescente_id"]:
+                flash("Você não tem permissão para ajustar essa semana deste adolescente.", "danger")
+            elif cumprimento["data_cumprimento"] not in datas_fase1:
+                flash("Adição rápida disponível apenas para semanas da Fase 1.", "warning")
+            else:
+                ids_selecionados = {
+                    int(item)
+                    for item in request.form.getlist("atividade_ids")
+                    if item.isdigit()
+                }
+                ids_validos = ids_selecionados.intersection(ids_atividades_semana)
+                if not ids_validos:
+                    flash("Selecione ao menos uma atividade para adicionar nesta semana.", "warning")
+                else:
+                    for atividade_id in ids_validos:
+                        registro = Atividade.upsert_cumprimento(
+                            {
+                                "adolescente_id": adolescente["id"],
+                                "atividade_id": atividade_id,
+                                "data_cumprimento": cumprimento["data_cumprimento"],
+                                "cumpriu": "1",
+                                "falta_justificada": "0",
+                                "observacoes": "",
+                            },
+                            apps_id=atividade_apps_id,
+                        )
+                        registrar_auditoria(
+                            "edicao_cumprimento",
+                            "cumprimento",
+                            registro["id"],
+                            f"Atividade adicionada na semana para {adolescente['nome']}.",
+                        )
+                    flash("Atividades adicionadas na semana com sucesso.", "success")
+                    return redirect(
+                        url_for(
+                            "listar_cumprimentos",
+                            adolescente_id=adolescente["id"],
+                            data_cumprimento=cumprimento["data_cumprimento"],
+                        )
+                    )
         else:
-            Atividade.atualizar_cumprimento(
-                cumprimento_id,
-                request.form,
-                presenca_id=presenca_id,
-                apps_id=atividade_apps_id,
-            )
-            registrar_auditoria(
-                "edicao_cumprimento",
-                "cumprimento",
-                cumprimento_id,
-                f"Cumprimento ajustado para {adolescente['nome']}.",
-            )
-            flash("Cumprimento atualizado com sucesso.", "success")
-            return redirect(url_for("listar_cumprimentos"))
+            erro = validar_campos_cumprimento(request.form)
+            adolescente = verificar_adolescente_do_formulario()
+            if erro:
+                flash(erro, "danger")
+            elif adolescente is None:
+                flash("Você não tem permissão para lançar tarefa para este adolescente.", "danger")
+            elif atividade_apps_id and request.form.get("atividade_id", "").isdigit() and int(request.form["atividade_id"]) == atividade_apps_id and not data_permitida_fase1_apps(request.form.get("data_cumprimento")):
+                flash("Na 1ª fase do Top Teens, a atividade APPS só pode ser lançada em 15/03/2026, 22/03/2026, 29/03/2026 ou 12/04/2026.", "danger")
+            elif atividade_apps_id and request.form.get("atividade_id", "").isdigit() and int(request.form["atividade_id"]) == atividade_apps_id and Atividade.existe_cumprimento_no_dia(
+                request.form.get("adolescente_id"),
+                atividade_apps_id,
+                request.form.get("data_cumprimento", ""),
+                excluir_id=cumprimento_id,
+            ):
+                flash("Esse adolescente já possui APPS lançado nessa data. Use o registro já existente.", "danger")
+            elif presenca_id and request.form.get("atividade_id", "").isdigit() and int(request.form["atividade_id"]) == presenca_id and Atividade.existe_cumprimento_no_dia(
+                request.form.get("adolescente_id"),
+                presenca_id,
+                request.form.get("data_cumprimento", ""),
+                excluir_id=cumprimento_id,
+            ):
+                flash("Esse adolescente já possui presença lançada nessa data. Edite o registro existente.", "danger")
+            else:
+                Atividade.atualizar_cumprimento(
+                    cumprimento_id,
+                    request.form,
+                    presenca_id=presenca_id,
+                    apps_id=atividade_apps_id,
+                )
+                registrar_auditoria(
+                    "edicao_cumprimento",
+                    "cumprimento",
+                    cumprimento_id,
+                    f"Cumprimento ajustado para {adolescente['nome']}.",
+                )
+                flash("Cumprimento atualizado com sucesso.", "success")
+                return redirect(url_for("listar_cumprimentos"))
 
     return render_template(
         "cumprimentos/formulario.html",
@@ -1230,6 +1509,8 @@ def editar_cumprimento(cumprimento_id):
         datas_apps_fase=sorted(DATAS_FASE1_APPS),
         datas_presenca_por_adolescente=datas_presenca_por_adolescente,
         datas_apps_por_adolescente=datas_apps_por_adolescente,
+        mostrar_adicao_na_edicao=mostrar_adicao_na_edicao,
+        atividades_adicionaveis=atividades_adicionaveis,
     )
 
 
@@ -1254,11 +1535,12 @@ def excluir_cumprimento(cumprimento_id):
 @app.route("/ranking")
 @login_obrigatorio
 def ranking():
+    ranking_visivel = filtrar_ranking_por_permissao(Pontuacao.ranking_geral())
     return render_template(
         "ranking.html",
-        ranking=Pontuacao.ranking_geral(),
-        ranking_genero=Pontuacao.ranking_por_sexo(),
-        lideres_mais_ativos=Pontuacao.ranking_lideres_mais_ativos(),
+        ranking=ranking_visivel,
+        ranking_genero=ranking_por_genero_de_lista(ranking_visivel),
+        lideres_mais_ativos=filtrar_lideres_ativos_por_permissao(Pontuacao.ranking_lideres_mais_ativos()),
     )
 
 

@@ -68,6 +68,7 @@
             <tr>
                 <th>Nome</th>
                 <th>Usuário</th>
+                <th>GA vinculado</th>
                 <th>Perfil</th>
                 <th>Aniversário</th>
                 <th>Contato</th>
@@ -84,6 +85,26 @@
                     {% endif %}
                 </td>
                 <td>{{ usuario.username }}</td>
+                <td>
+                    <form method="post" action="{{ url_for('definir_ga_usuario', usuario_id=usuario.id) }}" class="inline-form">
+                        <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
+                        <input
+                            type="text"
+                            name="lider_ga"
+                            maxlength="80"
+                            pattern="[A-Za-zÀ-ÿ' -]{3,80}"
+                            value="{{ usuario.lider_ga or '' }}"
+                            placeholder="Definir GA"
+                            {% if usuario.role == "MASTER" %}disabled{% endif %}
+                            required
+                        >
+                        {% if usuario.role != "MASTER" %}
+                        <button type="submit" class="button-link alt">Salvar</button>
+                        {% else %}
+                        <small class="table-note">N/A</small>
+                        {% endif %}
+                    </form>
+                </td>
                 <td>
                     <span class="role-badge {{ 'role-master' if usuario.role == 'MASTER' else 'role-leader' }}">
                         {{ "Master" if usuario.role == "MASTER" else "Líder" }}
@@ -110,7 +131,7 @@
                 </td>
             </tr>
             {% else %}
-            <tr><td colspan="6">Nenhum usuário aprovado encontrado.</td></tr>
+            <tr><td colspan="7">Nenhum usuário aprovado encontrado.</td></tr>
             {% endfor %}
         </tbody>
     </table>

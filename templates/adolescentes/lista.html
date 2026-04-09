@@ -1,66 +1,73 @@
 {% extends "base.html" %}
 
 {% block content %}
-<section class="page-head">
-    <div>
-        <p class="section-tag">Cadastro</p>
-        <h2>Adolescentes</h2>
-    </div>
-    <a class="button-link" href="{{ url_for('novo_adolescente') }}">Novo cadastro</a>
-</section>
+<section class="ga-mobile-screen">
+    <header class="ga-mobile-header">
+        <div class="ga-mobile-title-row">
+            <h2>Meu GA</h2>
+            <div class="ga-mobile-icons" aria-hidden="true">
+                <span>N</span>
+                <span>R</span>
+                <span>C</span>
+            </div>
+        </div>
+        <form method="get" class="ga-mobile-filters">
+            <input type="text" name="busca" maxlength="80" placeholder="Buscar adolescente" value="{{ filtros.busca }}">
+            {% if usuario_master() %}
+            <select name="lider_ga">
+                <option value="">Todos os GA</option>
+                {% for lider in lideres %}
+                <option value="{{ lider }}" {% if filtros.lider_ga == lider %}selected{% endif %}>{{ lider }}</option>
+                {% endfor %}
+            </select>
+            {% endif %}
+            <select name="sexo">
+                <option value="">Todos os gêneros</option>
+                <option value="M" {% if filtros.sexo == "M" %}selected{% endif %}>Masculino</option>
+                <option value="F" {% if filtros.sexo == "F" %}selected{% endif %}>Feminino</option>
+            </select>
+            <button type="submit">Filtrar</button>
+        </form>
+    </header>
 
-<section class="card">
-    <form method="get" class="filters">
-        <input type="text" name="busca" maxlength="80" placeholder="Pesquisar por nome ou matrícula" value="{{ filtros.busca }}">
-        {% if usuario_master() %}
-        <select name="lider_ga">
-            <option value="">Todos os líderes de GA</option>
-            {% for lider in lideres %}
-            <option value="{{ lider }}" {% if filtros.lider_ga == lider %}selected{% endif %}>{{ lider }}</option>
-            {% endfor %}
-        </select>
-        {% endif %}
-        <select name="sexo">
-            <option value="">Todos os gêneros</option>
-            <option value="M" {% if filtros.sexo == "M" %}selected{% endif %}>Masculino</option>
-            <option value="F" {% if filtros.sexo == "F" %}selected{% endif %}>Feminino</option>
-        </select>
-        <button type="submit">Filtrar</button>
-    </form>
-</section>
-
-<section class="card">
-    <table>
-        <thead>
-            <tr>
-                <th>Matrícula</th>
-                <th>Nome</th>
-                <th>Gênero</th>
-                <th>Contato</th>
-                <th>Líder de GA</th>
-                <th>Ações</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for adolescente in adolescentes %}
-            <tr>
-                <td>{{ adolescente.matricula }}</td>
-                <td><a href="{{ url_for('detalhe_adolescente', adolescente_id=adolescente.id) }}">{{ adolescente.nome }}</a></td>
-                <td>{{ "Masculino" if adolescente.sexo == "M" else "Feminino" }}</td>
-                <td>{{ adolescente.contato or "-" }}</td>
-                <td>{{ adolescente.lider_ga }}</td>
-                <td class="actions">
+    <div class="ga-mobile-list">
+        {% for adolescente in adolescentes %}
+        {% set inicial = adolescente.nome[:1].upper() if adolescente.nome else '?' %}
+        <article class="ga-mobile-card">
+            <div class="ga-mobile-avatar">{{ inicial }}</div>
+            <div class="ga-mobile-body">
+                <h3><a href="{{ url_for('detalhe_adolescente', adolescente_id=adolescente.id) }}">{{ adolescente.nome }}</a></h3>
+                <p>
+                    {% if adolescente.idade is not none %}
+                    {{ adolescente.idade }} anos
+                    {% else %}
+                    Idade não informada
+                    {% endif %}
+                    ({{ adolescente.aniversario_curto }})
+                </p>
+            </div>
+            <details class="ga-mobile-menu">
+                <summary aria-label="Ações">&#8942;</summary>
+                <div class="ga-mobile-menu-content">
+                    <a href="{{ url_for('detalhe_adolescente', adolescente_id=adolescente.id) }}">Ver perfil</a>
                     <a href="{{ url_for('editar_adolescente', adolescente_id=adolescente.id) }}">Editar</a>
                     <form method="post" action="{{ url_for('excluir_adolescente', adolescente_id=adolescente.id) }}">
                         <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
                         <button type="submit" class="button-link danger">Excluir</button>
                     </form>
-                </td>
-            </tr>
-            {% else %}
-            <tr><td colspan="6">Nenhum adolescente encontrado.</td></tr>
-            {% endfor %}
-        </tbody>
-    </table>
+                </div>
+            </details>
+        </article>
+        {% else %}
+        <article class="ga-mobile-card">
+            <div class="ga-mobile-body">
+                <h3>Nenhum adolescente encontrado</h3>
+                <p>Ajuste os filtros para ver os resultados.</p>
+            </div>
+        </article>
+        {% endfor %}
+    </div>
+
+    <a class="ga-mobile-fab" href="{{ url_for('novo_adolescente') }}" aria-label="Novo adolescente">+</a>
 </section>
 {% endblock %}

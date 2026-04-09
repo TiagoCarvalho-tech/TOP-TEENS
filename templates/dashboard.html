@@ -1,139 +1,124 @@
 {% extends "base.html" %}
 
 {% block content %}
-<section class="hero">
-    <div>
+<section class="dash-mobile-screen">
+    <header class="dash-mobile-header">
         <p class="section-tag">Painel geral</p>
-        <h2>Controle completo do Nova Teens</h2>
-        <p class="muted">Acompanhe pontuação, aniversários e a performance por gênero.</p>
-    </div>
-    <div class="hero-actions">
-        <a class="button-link" href="{{ url_for('novo_adolescente') }}">Novo adolescente</a>
-        <a class="button-link alt" href="{{ url_for('novo_cumprimento') }}">Registrar atividade</a>
-    </div>
-</section>
-
-<section class="stats">
-    <article class="card stat-card">
-        <span>Total de adolescentes</span>
-        <strong>{{ resumo.total_adolescentes }}</strong>
-    </article>
-    <article class="card stat-card">
-        <span>Pontos acumulados</span>
-        <strong>{{ resumo.total_pontos }}</strong>
-    </article>
-    <article class="card stat-card">
-        <span>Líderes de GA</span>
-        <strong>{{ resumo.lideres_ga|length }}</strong>
-    </article>
-</section>
-
-<section class="grid-two">
-    <article class="card">
-        <div class="card-head">
-            <h3>Top 5 geral</h3>
-            <a href="{{ url_for('ranking') }}">Ver ranking completo</a>
+        <h2>Nova Teens</h2>
+        <p class="dash-mobile-subtitle">Resumo rápido da fase, aniversários e rankings.</p>
+        <div class="dash-mobile-actions">
+            <a class="button-link" href="{{ url_for('novo_adolescente') }}">Novo adolescente</a>
+            <a class="button-link alt" href="{{ url_for('novo_cumprimento') }}">Registrar atividade</a>
         </div>
-        <table>
-            <thead>
-                <tr>
-                    <th>Adolescente</th>
-                    <th>GA</th>
-                    <th>Pontos</th>
-                </tr>
-            </thead>
-            <tbody>
+    </header>
+
+    <div class="dash-mobile-content">
+        <section class="dash-metric-grid">
+            <article class="dash-metric-card">
+                <span>Total de adolescentes</span>
+                <strong>{{ resumo.total_adolescentes }}</strong>
+            </article>
+            <article class="dash-metric-card">
+                <span>Pontos acumulados</span>
+                <strong>{{ resumo.total_pontos }}</strong>
+            </article>
+            <article class="dash-metric-card">
+                <span>Líderes de GA</span>
+                <strong>{{ resumo.lideres_ga|length }}</strong>
+            </article>
+        </section>
+
+        <section class="dash-block">
+            <div class="dash-block-head">
+                <h3>Top 5 geral</h3>
+                <a href="{{ url_for('ranking') }}">Ver tudo</a>
+            </div>
+            <div class="dash-list">
                 {% for item in resumo.top_5 %}
-                <tr>
-                    <td>{{ item.nome }}</td>
-                    <td>{{ item.lider_ga }}</td>
-                    <td>{{ item.total_pontos }}</td>
-                </tr>
+                <article class="dash-list-item">
+                    <div>
+                        <strong>{{ item.nome }}</strong>
+                        <p>GA {{ item.lider_ga }}</p>
+                    </div>
+                    <span>{{ item.total_pontos }} pts</span>
+                </article>
                 {% else %}
-                <tr><td colspan="3">Nenhum adolescente cadastrado.</td></tr>
+                <p class="muted-page">Nenhum adolescente cadastrado.</p>
                 {% endfor %}
-            </tbody>
-        </table>
-    </article>
+            </div>
+        </section>
 
-    <article class="card">
-        <div class="card-head">
-            <h3>Aniversários próximos</h3>
-            <span class="muted">Próximos 30 dias</span>
-        </div>
-        <ul class="list-clean">
-            {% for item in aniversariantes %}
-            <li>
-                <strong>{{ item.nome }}</strong>
-                <span>{{ item.data_aniversario.strftime("%d/%m") }} • faltam {{ item.faltam }} dia(s)</span>
-            </li>
-            {% else %}
-            <li>Nenhum aniversário próximo.</li>
-            {% endfor %}
-        </ul>
-    </article>
-</section>
+        <section class="dash-block">
+            <div class="dash-block-head">
+                <h3>Aniversários próximos</h3>
+                <span>30 dias</span>
+            </div>
+            <div class="dash-list">
+                {% for item in aniversariantes %}
+                <article class="dash-list-item">
+                    <div>
+                        <strong>{{ item.nome }}</strong>
+                        <p>{{ item.data_aniversario.strftime("%d/%m") }} • faltam {{ item.faltam }} dia(s)</p>
+                    </div>
+                </article>
+                {% else %}
+                <p class="muted-page">Nenhum aniversário próximo.</p>
+                {% endfor %}
+            </div>
+        </section>
 
-<section class="grid-two">
-    <article class="card">
-        <div class="card-head">
-            <h3>Ranking masculino</h3>
-        </div>
-        <ol class="ranking-list">
-            {% for item in ranking_genero["M"][:5] %}
-            <li><span>{{ item.nome }}</span><strong>{{ item.total_pontos }}</strong></li>
-            {% else %}
-            <li>Nenhum registro.</li>
-            {% endfor %}
-        </ol>
-    </article>
+        <section class="dash-double-block">
+            <article class="dash-block">
+                <div class="dash-block-head">
+                    <h3>Masculino</h3>
+                </div>
+                <div class="dash-list">
+                    {% for item in ranking_genero["M"][:5] %}
+                    <article class="dash-list-item">
+                        <strong>{{ item.nome }}</strong>
+                        <span>{{ item.total_pontos }} pts</span>
+                    </article>
+                    {% else %}
+                    <p class="muted-page">Nenhum registro.</p>
+                    {% endfor %}
+                </div>
+            </article>
 
-    <article class="card">
-        <div class="card-head">
-            <h3>Ranking feminino</h3>
-        </div>
-        <ol class="ranking-list">
-            {% for item in ranking_genero["F"][:5] %}
-            <li><span>{{ item.nome }}</span><strong>{{ item.total_pontos }}</strong></li>
-            {% else %}
-            <li>Nenhum registro.</li>
-            {% endfor %}
-        </ol>
-    </article>
-</section>
+            <article class="dash-block">
+                <div class="dash-block-head">
+                    <h3>Feminino</h3>
+                </div>
+                <div class="dash-list">
+                    {% for item in ranking_genero["F"][:5] %}
+                    <article class="dash-list-item">
+                        <strong>{{ item.nome }}</strong>
+                        <span>{{ item.total_pontos }} pts</span>
+                    </article>
+                    {% else %}
+                    <p class="muted-page">Nenhum registro.</p>
+                    {% endfor %}
+                </div>
+            </article>
+        </section>
 
-<section class="card">
-    <div class="card-head">
-        <div>
-            <h3>Líderes mais ativos</h3>
-            <p class="muted-page">Medição por ações reais no sistema: cadastros e edições de adolescentes, além de lançamentos e edições de cumprimentos.</p>
-        </div>
+        <section class="dash-block">
+            <div class="dash-block-head">
+                <h3>Líderes mais ativos</h3>
+            </div>
+            <div class="dash-list">
+                {% for item in lideres_mais_ativos[:5] %}
+                <article class="dash-list-item">
+                    <div>
+                        <strong>{{ loop.index }}. {{ item.nome }}</strong>
+                        <p>{{ "Master" if item.role == "MASTER" else "Líder" }} • {{ item.adolescentes_cadastrados }} cadastros • {{ item.cumprimentos_lancados }} lançamentos</p>
+                    </div>
+                    <span>{{ item.total_acoes }}</span>
+                </article>
+                {% else %}
+                <p class="muted-page">Ainda não há ações registradas.</p>
+                {% endfor %}
+            </div>
+        </section>
     </div>
-    <table>
-        <thead>
-            <tr>
-                <th>#</th>
-                <th>Usuário</th>
-                <th>Perfil</th>
-                <th>Ações</th>
-                <th>Cadastros</th>
-                <th>Lançamentos</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for item in lideres_mais_ativos[:5] %}
-            <tr>
-                <td>{{ loop.index }}</td>
-                <td>{{ item.nome }}</td>
-                <td>{{ "Master" if item.role == "MASTER" else "Líder" }}</td>
-                <td><strong>{{ item.total_acoes }}</strong></td>
-                <td>{{ item.adolescentes_cadastrados }}</td>
-                <td>{{ item.cumprimentos_lancados }}</td>
-            </tr>
-            {% else %}
-            <tr><td colspan="6">Ainda não há ações registradas no sistema.</td></tr>
-            {% endfor %}
-        </tbody>
-    </table>
 </section>
 {% endblock %}

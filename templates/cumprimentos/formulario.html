@@ -4,7 +4,7 @@
 <section class="page-head">
     <div>
         <p class="section-tag">Execução</p>
-        <h2>{% if cumprimento %}Editar cumprimento{% else %}Novo cumprimento de tarefa{% endif %}</h2>
+        <h2>{% if cumprimento %}Editar cumprimento{% else %}Pontuação{% endif %}</h2>
     </div>
 </section>
 
@@ -12,6 +12,7 @@
     {% if cumprimento %}
     <form method="post" class="form-grid two-cols">
         <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
+        <input type="hidden" name="action" value="salvar_cumprimento">
         <label class="full-span">
             Buscar adolescente
             <input
@@ -50,7 +51,7 @@
         <label>
             Data
             <input type="date" name="data_cumprimento" value="{{ cumprimento.data_cumprimento if cumprimento else today }}" required>
-            <small class="field-help">Na 1ª fase do Top Teens, a atividade Presença só pode ser lançada nas datas: 15/03/2026, 22/03/2026, 29/03/2026 e 12/04/2026.</small>
+            <small class="field-help">Na 1ª fase do Top Teens, a atividade APPS só pode ser lançada nas datas: 15/03/2026, 22/03/2026, 29/03/2026 e 12/04/2026.</small>
         </label>
         <label>
             Cumpriu?
@@ -65,101 +66,179 @@
                 <input type="checkbox" name="falta_justificada" value="1" {% if cumprimento and cumprimento.falta_justificada %}checked{% endif %}>
                 Marcar falta justificada
             </span>
-            <small class="field-help">Use apenas quando a atividade for Presença e o status for Não.</small>
+            <small class="field-help">Use apenas quando a atividade for APPS e o status for Não.</small>
         </label>
         <label class="full-span">
             Observações
             <textarea name="observacoes" rows="4" maxlength="200">{{ cumprimento.observacoes if cumprimento else '' }}</textarea>
         </label>
         <div class="form-actions">
-            <button type="submit">{% if cumprimento %}Salvar registro{% else %}Registrar cumprimento{% endif %}</button>
+            <button type="submit">Salvar registro</button>
         </div>
     </form>
-    {% else %}
-    <form
-        id="novo-cumprimento-form"
-        method="post"
-        class="form-grid two-cols"
-        data-presenca-id="{{ presenca_id or '' }}"
-        data-apps-id="{{ apps_id or '' }}"
-        data-datas-apps-fase='{{ datas_apps_fase | tojson }}'
-        data-datas-apps-lancadas='{{ datas_apps_por_adolescente | tojson }}'
-        data-datas-presenca='{{ datas_presenca_por_adolescente | tojson }}'
-    >
+    {% if mostrar_adicao_na_edicao %}
+    <hr>
+    <form method="post" class="form-grid">
         <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
-        <label class="full-span">
-            Buscar adolescente
-            <input
-                type="text"
-                id="adolescente-busca-novo"
-                data-adolescente-busca-for="adolescente-select-novo"
-                placeholder="Digite parte do nome para filtrar a lista"
-                autocomplete="off"
-            >
-            <small class="field-help">A lista abaixo é filtrada conforme você digita.</small>
-        </label>
-        <label>
-            Adolescente
-            <select id="adolescente-select-novo" name="adolescente_id" required>
-                <option value="">Selecione</option>
-                {% for adolescente in adolescentes %}
-                <option value="{{ adolescente.id }}">
-                    {{ adolescente.nome }} - {{ adolescente.matricula }}
-                </option>
-                {% endfor %}
-            </select>
-        </label>
-        <label>
-            Data
-            <input id="novo-cumprimento-data" type="date" name="data_cumprimento" value="{{ today }}" required>
-            <small class="field-help">A data escolhida é aplicada às atividades selecionadas, exceto APPS.</small>
-            <small id="datas-presenca-bloqueadas" class="field-help"></small>
-        </label>
-        <div class="full-span">
-            <span class="field-title">Atividades do mesmo lançamento</span>
-            <div class="activity-picker">
-                {% for atividade in atividades %}
-                <label class="activity-option">
-                    <input type="checkbox" name="atividade_ids" value="{{ atividade.id }}">
-                    <span>{{ atividade.nome }}</span>
-                    <strong>{{ atividade.pontos }} pts</strong>
+        <input type="hidden" name="action" value="adicionar_atividade_semana">
+        <input type="hidden" name="adolescente_id" value="{{ cumprimento.adolescente_id }}">
+        <h4>Adicionar atividade esquecida na semana {{ cumprimento.data_cumprimento }}</h4>
+        <div class="activity-picker">
+            {% for atividade in atividades_adicionaveis %}
+            <label class="activity-option">
+                <input type="checkbox" name="atividade_ids" value="{{ atividade.id }}">
+                <span>{{ atividade.nome }}</span>
+                <strong>{{ atividade.pontos }} pts</strong>
+            </label>
+            {% endfor %}
+        </div>
+        <div class="form-actions">
+            <button type="submit">Adicionar atividade na semana</button>
+        </div>
+    </form>
+    {% endif %}
+    {% else %}
+    <div class="pontuacao-mobile-screen">
+        <header class="pontuacao-mobile-header">
+            <div class="pontuacao-mobile-top">
+                <a class="pontuacao-back" href="{{ url_for('listar_cumprimentos') }}">‹</a>
+                <h3>Pontuação</h3>
+                <div class="pontuacao-mobile-icons" aria-hidden="true">CAL</div>
+            </div>
+            <form method="get" class="pontuacao-mobile-picker">
+                <label>
+                    Buscar adolescente
+                    <input
+                        type="text"
+                        id="adolescente-busca-novo"
+                        data-adolescente-busca-for="adolescente-select-novo"
+                        placeholder="Digite o nome"
+                        autocomplete="off"
+                    >
                 </label>
+                <label>
+                    Adolescente
+                    <select id="adolescente-select-novo" name="adolescente_id" required>
+                        <option value="">Selecione</option>
+                        {% for adolescente in adolescentes %}
+                        <option value="{{ adolescente.id }}" {% if adolescente_id and adolescente_id == adolescente.id %}selected{% endif %}>
+                            {{ adolescente.nome }} - {{ adolescente.matricula }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </label>
+                <button type="submit">Carregar</button>
+            </form>
+        </header>
+
+        {% if adolescente_selecionado %}
+        {% set inicial = adolescente_selecionado.nome[:1].upper() if adolescente_selecionado.nome else '?' %}
+        <article class="pontuacao-resumo-card">
+            <div class="pontuacao-resumo-avatar">{{ inicial }}</div>
+            <div>
+                <h4>{{ adolescente_selecionado.nome }}</h4>
+                <p>Fase: {{ pontuacao_adolescente.pontos_tarefas if pontuacao_adolescente else 0 }} pts</p>
+                <p class="pontuacao-total">Total Geral: {{ pontuacao_adolescente.total_pontos if pontuacao_adolescente else 0 }} pts</p>
+            </div>
+        </article>
+
+        <div class="pontuacao-semana-list">
+            {% for semana in semanas_fase1 %}
+            {% set partes = semana.data.split('-') %}
+            {% set data_curta = partes[2] ~ '/' ~ partes[1] %}
+            <form method="post" class="pontuacao-semana-card">
+                <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
+                <input type="hidden" name="action" value="salvar_semana">
+                <input type="hidden" name="adolescente_id" value="{{ adolescente_selecionado.id }}">
+                <input type="hidden" name="semana_data" value="{{ semana.data }}">
+                <div class="pontuacao-semana-head">
+                    <span>{{ semana.nome }} - {{ data_curta }}</span>
+                    <strong>{{ pontos_por_semana.get(semana.data, 0) }} pts</strong>
+                </div>
+                <div class="pontuacao-pills">
+                    {% for atividade in semana_atividades %}
+                    {% if atividade.nome == "Presença culto" %}
+                        {% set sigla = "P" %}
+                    {% elif atividade.nome == "Meditação e versículo" %}
+                        {% set sigla = "M" %}
+                    {% elif atividade.nome == "Bíblia e anotação" %}
+                        {% set sigla = "B/A" %}
+                    {% elif atividade.nome == "Visitante" %}
+                        {% set sigla = "V" %}
+                    {% else %}
+                        {% set sigla = atividade.nome[:1] %}
+                    {% endif %}
+                    <label class="pontuacao-pill {% if atividade.id in semana_marcacoes[semana.data] %}active{% endif %}" title="{{ atividade.nome }}">
+                        <input
+                            type="checkbox"
+                            name="atividade_ids"
+                            value="{{ atividade.id }}"
+                            {% if atividade.id in semana_marcacoes[semana.data] %}checked{% endif %}
+                        >
+                        <span>{{ sigla }}</span>
+                    </label>
+                    {% endfor %}
+                </div>
+                <div class="form-actions">
+                    <button type="submit">Salvar semana</button>
+                </div>
+            </form>
+            {% endfor %}
+        </div>
+
+        {% if apps_id %}
+        <form method="post" class="pontuacao-apps-card">
+            <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
+            <input type="hidden" name="action" value="salvar_apps">
+            <input type="hidden" name="adolescente_id" value="{{ adolescente_selecionado.id }}">
+            <h4>Atividades da Fase</h4>
+            <p class="muted-page">APPS</p>
+            <div class="pontuacao-apps-list">
+                {% for semana in semanas_fase1 %}
+                {% set apps_registro = apps_marcacoes.get(semana.data) %}
+                <article class="pontuacao-apps-item">
+                    <strong>{{ semana.nome }} - {{ semana.data }}</strong>
+                    <label class="checkbox-inline">
+                        <input
+                            type="checkbox"
+                            name="apps_lancar_{{ semana.data }}"
+                            value="1"
+                            {% if not apps_registro %}checked{% endif %}
+                            {% if apps_registro %}disabled{% endif %}
+                        >
+                        Lançar
+                    </label>
+                    <label>
+                        Presente?
+                        <select name="apps_cumpriu_{{ semana.data }}" {% if apps_registro %}disabled{% endif %}>
+                            <option value="1" {% if not apps_registro or apps_registro.cumpriu == 1 %}selected{% endif %}>Sim</option>
+                            <option value="0" {% if apps_registro and apps_registro.cumpriu == 0 %}selected{% endif %}>Não</option>
+                        </select>
+                    </label>
+                    <label class="checkbox-inline">
+                        <input
+                            type="checkbox"
+                            name="apps_falta_justificada_{{ semana.data }}"
+                            value="1"
+                            {% if apps_registro and apps_registro.falta_justificada %}checked{% endif %}
+                            {% if apps_registro %}disabled{% endif %}
+                        >
+                        Falta justificada
+                    </label>
+                </article>
                 {% endfor %}
             </div>
-            <small class="field-help">Selecione as atividades que deseja lançar para o adolescente nesta data.</small>
+            <div class="form-actions">
+                <button type="submit">Salvar APPS</button>
+            </div>
+        </form>
+        {% endif %}
+        {% else %}
+        <div class="pontuacao-empty">
+            <p>Selecione um adolescente para abrir a pontuação da fase.</p>
         </div>
-        <label id="apps-fase-data-wrapper" class="full-span" style="display: none;">
-            Dia do APPS (1ª fase)
-            <select id="apps-fase-data-select">
-                <option value="">Selecione uma data da fase</option>
-                {% for data_apps in datas_apps_fase %}
-                <option value="{{ data_apps }}">{{ data_apps }}</option>
-                {% endfor %}
-            </select>
-            <small class="field-help">Ao marcar APPS, selecione uma dessas datas: 2026-03-15, 2026-03-22, 2026-03-29, 2026-04-12. Datas já lançadas ficam bloqueadas para novo lançamento.</small>
-        </label>
-        <label id="apps-status-wrapper" class="full-span" style="display: none;">
-            Adolescente estava presente no APPS?
-            <select id="apps-cumpriu-select" name="apps_cumpriu">
-                <option value="1" selected>Sim</option>
-                <option value="0">Não</option>
-            </select>
-        </label>
-        <label id="apps-justificativa-wrapper" class="full-span" style="display: none;">
-            <span class="checkbox-inline">
-                <input type="checkbox" name="apps_falta_justificada" value="1">
-                Falta justificada no APPS
-            </span>
-            <small class="field-help">Use quando marcar APPS com status Não.</small>
-        </label>
-        <label class="full-span">
-            Observações
-            <textarea name="observacoes" rows="4" maxlength="200" placeholder="Opcional. Esta observação será aplicada a todas as atividades selecionadas."></textarea>
-        </label>
-        <div class="form-actions">
-            <button type="submit">Registrar atividades em lote</button>
-        </div>
-    </form>
+        {% endif %}
+    </div>
     {% endif %}
 </section>
 {% endblock %}

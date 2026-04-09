@@ -1,34 +1,38 @@
 {% extends "base.html" %}
 
 {% block content %}
-<section class="auth-shell">
-    <article class="auth-hero">
-        <img class="hero-logo" src="{{ url_for('static', filename='logo-nova-teens.png') }}" alt="Logo Nova Teens">
-        <h2>Nova Teens</h2>
-    </article>
-
-    <article class="auth-card wide">
-        <div class="auth-head">
-            <div>
-                <h2>Entrar no sistema</h2>
-            </div>
-            <a class="button-link alt" href="{{ url_for('cadastro_usuario') }}">Criar conta de líder</a>
+<section class="mobile-auth-wrapper">
+    <article class="mobile-auth-panel">
+        <div class="mobile-auth-brand">
+            <img class="hero-logo" src="{{ url_for('static', filename='logo-nova-teens.png') }}" alt="Logo Nova Teens">
+            <h2>Nova Teens</h2>
         </div>
 
-        <form method="post" class="form-grid">
-            <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
-            <label>
-                Usuário
-                <input type="text" name="username" autocomplete="username" maxlength="30" required>
-            </label>
-            <label>
-                Senha
-                <input type="password" name="senha" autocomplete="current-password" maxlength="128" required>
-            </label>
-            <button type="submit">Entrar</button>
-        </form>
+        <div class="mobile-login-box">
+            <div class="auth-head compact">
+                <div>
+                    <h2>Entrar no sistema</h2>
+                    <p class="muted-page">Faça login para continuar</p>
+                </div>
+            </div>
 
-        <p class="helper">A conta inicial do master continua sendo <strong>tio</strong>. Troque a senha assim que entrar.</p>
+            <form method="post" class="form-grid">
+                <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
+                <label>
+                    Matrícula ou usuário
+                    <input type="text" name="username" autocomplete="username" maxlength="30" required>
+                </label>
+                <label>
+                    Senha
+                    <input type="password" name="senha" autocomplete="current-password" maxlength="128" required>
+                </label>
+                <button type="submit">Entrar</button>
+            </form>
+
+            <div class="auth-row-links">
+                <a class="button-link alt" href="{{ url_for('cadastro_usuario') }}">Criar conta de líder</a>
+            </div>
+        </div>
     </article>
 </section>
 {% endblock %}
