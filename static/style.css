@@ -574,30 +574,13 @@ thead th {
 .ga-mobile-title-row {
     display: flex;
     align-items: center;
-    justify-content: space-between;
+    justify-content: flex-start;
 }
 
 .ga-mobile-title-row h2 {
     margin: 0;
     font-size: 2rem;
     color: #fff;
-}
-
-.ga-mobile-icons {
-    display: inline-flex;
-    gap: 12px;
-    font-size: 1.1rem;
-}
-
-.ga-mobile-icons span {
-    width: 26px;
-    height: 26px;
-    border-radius: 999px;
-    border: 1px solid rgba(255, 255, 255, 0.35);
-    display: grid;
-    place-items: center;
-    font-size: 0.72rem;
-    font-weight: 700;
 }
 
 .ga-mobile-filters {
@@ -1060,7 +1043,6 @@ thead th {
     padding: 0 10px;
 }
 
-.pontuacao-pill.active span,
 .pontuacao-pill input:checked + span {
     background: #d9efdb;
     border-color: #84c78b;

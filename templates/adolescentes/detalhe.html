@@ -36,20 +36,20 @@
                 <strong>{{ pontuacao.semanas.get(data_semana, 0) if pontuacao else 0 }} pts</strong>
             </div>
             <div class="pontuacao-pills">
-                <label class="pontuacao-pill {% if marcacoes_semana[data_semana]['P'] %}active{% endif %}">
-                    <input type="checkbox" name="itens" value="P" onchange="this.form.submit()" {% if marcacoes_semana[data_semana]['P'] %}checked{% endif %}>
+                <label class="pontuacao-pill">
+                    <input type="checkbox" name="itens" value="P" {% if marcacoes_semana[data_semana]['P'] %}checked{% endif %}>
                     <span>P</span>
                 </label>
-                <label class="pontuacao-pill {% if marcacoes_semana[data_semana]['MV'] %}active{% endif %}">
-                    <input type="checkbox" name="itens" value="MV" onchange="this.form.submit()" {% if marcacoes_semana[data_semana]['MV'] %}checked{% endif %}>
+                <label class="pontuacao-pill">
+                    <input type="checkbox" name="itens" value="MV" {% if marcacoes_semana[data_semana]['MV'] %}checked{% endif %}>
                     <span>MV</span>
                 </label>
-                <label class="pontuacao-pill {% if marcacoes_semana[data_semana]['AB'] %}active{% endif %}">
-                    <input type="checkbox" name="itens" value="AB" onchange="this.form.submit()" {% if marcacoes_semana[data_semana]['AB'] %}checked{% endif %}>
+                <label class="pontuacao-pill">
+                    <input type="checkbox" name="itens" value="AB" {% if marcacoes_semana[data_semana]['AB'] %}checked{% endif %}>
                     <span>AB</span>
                 </label>
-                <label class="pontuacao-pill {% if marcacoes_semana[data_semana]['V'] %}active{% endif %}">
-                    <input type="checkbox" name="itens" value="V" onchange="this.form.submit()" {% if marcacoes_semana[data_semana]['V'] %}checked{% endif %}>
+                <label class="pontuacao-pill">
+                    <input type="checkbox" name="itens" value="V" {% if marcacoes_semana[data_semana]['V'] %}checked{% endif %}>
                     <span>V</span>
                 </label>
             </div>
@@ -65,8 +65,8 @@
         <input type="hidden" name="action" value="salvar_apps">
         <h4>APPs</h4>
         <p class="muted-page">Vale 40 pontos</p>
-        <label class="pontuacao-pill {% if apps_marcado %}active{% endif %}">
-            <input type="checkbox" name="apps_marcado" value="1" onchange="this.form.submit()" {% if apps_marcado %}checked{% endif %}>
+        <label class="pontuacao-pill">
+            <input type="checkbox" name="apps_marcado" value="1" {% if apps_marcado %}checked{% endif %}>
             <span>APPS</span>
         </label>
         <div class="form-actions">
