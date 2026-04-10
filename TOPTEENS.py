@@ -1,11 +1,13 @@
 from datetime import date, datetime, timedelta
 from functools import wraps
+from io import BytesIO
 from os import environ
 from pathlib import Path
 import re
 import secrets
 
 from flask import Flask, abort, flash, redirect, render_template, request, session, url_for
+from PIL import Image, ImageOps, UnidentifiedImageError
 from werkzeug.security import check_password_hash, generate_password_hash
 from werkzeug.utils import secure_filename
 
@@ -38,7 +40,10 @@ app.config["SESSION_COOKIE_HTTPONLY"] = True
 app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
 app.config["SESSION_COOKIE_SECURE"] = environ.get("TOPTEENS_HTTPS_ONLY", "0") == "1"
 app.config["PERMANENT_SESSION_LIFETIME"] = timedelta(hours=8)
-app.config["MAX_CONTENT_LENGTH"] = 1024 * 1024
+MAX_UPLOAD_MB = max(1, int(environ.get("TOPTEENS_MAX_UPLOAD_MB", "10")))
+MAX_UPLOAD_BYTES = MAX_UPLOAD_MB * 1024 * 1024
+MAX_IMAGE_DIMENSION = 1024
+app.config["MAX_CONTENT_LENGTH"] = MAX_UPLOAD_BYTES
 FASE1_SEMANAS = [
     ("Semana 1", "2026-03-15"),
     ("Semana 2", "2026-03-22"),
@@ -49,7 +54,7 @@ DATAS_FASE1 = {data for _, data in FASE1_SEMANAS}
 DATAS_FASE1_APPS = set(DATAS_FASE1)
 UPLOADS_DIR = BASE_DIR / "static" / "uploads"
 UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
-EXTENSOES_FOTO_PERMITIDAS = {"jpg", "jpeg", "png", "webp"}
+EXTENSOES_FOTO_PERMITIDAS = {"jpg", "jpeg", "png"}
 
 ATIVIDADES_FASE = {
     "P": {"nome": "Presença", "pontos": 10, "aliases": {"presença", "presenca", "presença culto"}},
@@ -161,11 +166,45 @@ def salvar_foto_adolescente(arquivo, nome_base):
     if not extensao_foto_permitida(arquivo.filename):
         return None
 
-    extensao = arquivo.filename.rsplit(".", 1)[1].lower()
-    nome_arquivo = secure_filename(f"{nome_slug(nome_base)}-{secrets.token_hex(8)}.{extensao}")
+    extensao_origem = arquivo.filename.rsplit(".", 1)[1].lower()
+    try:
+        arquivo.stream.seek(0)
+        with Image.open(arquivo.stream) as imagem:
+            formato = (imagem.format or "").upper()
+            if formato not in {"JPEG", "JPG", "PNG"}:
+                return None
+
+            imagem = ImageOps.exif_transpose(imagem)
+            imagem.thumbnail((MAX_IMAGE_DIMENSION, MAX_IMAGE_DIMENSION), Image.Resampling.LANCZOS)
+
+            conteudo = BytesIO()
+            extensao_final = "png" if extensao_origem == "png" else "jpg"
+            if extensao_final == "png":
+                if imagem.mode not in {"RGB", "RGBA", "L", "P"}:
+                    imagem = imagem.convert("RGBA")
+                imagem.save(conteudo, format="PNG", optimize=True, compress_level=6)
+            else:
+                if imagem.mode != "RGB":
+                    imagem = imagem.convert("RGB")
+                imagem.save(conteudo, format="JPEG", quality=82, optimize=True, progressive=True)
+    except (UnidentifiedImageError, OSError, ValueError):
+        return None
+
+    nome_arquivo = secure_filename(f"{nome_slug(nome_base)}-{secrets.token_hex(8)}.{extensao_final}")
     destino = UPLOADS_DIR / nome_arquivo
-    arquivo.save(destino)
+    destino.write_bytes(conteudo.getvalue())
     return f"uploads/{nome_arquivo}"
+
+
+@app.errorhandler(413)
+def tratar_upload_grande(_erro):
+    flash(
+        f"Arquivo muito grande. Envie uma imagem de até {MAX_UPLOAD_MB}MB em JPG ou PNG.",
+        "danger",
+    )
+    if request.method == "POST":
+        return redirect(request.url), 303
+    return redirect(url_for("listar_adolescentes")), 303
 
 
 def mapear_atividades_fixas_ids():
@@ -1126,7 +1165,7 @@ def novo_adolescente():
         if not erro:
             foto_path = salvar_foto_adolescente(request.files.get("foto"), request.form.get("nome", "adolescente"))
             if foto_path is None:
-                erro = "Foto inválida. Envie JPG, PNG ou WEBP."
+                erro = "Foto inválida. Envie JPG, JPEG ou PNG."
             elif not foto_path:
                 erro = "A foto do adolescente é obrigatória."
         if erro:
@@ -1163,7 +1202,7 @@ def editar_adolescente(adolescente_id):
         if not erro and nova_foto and nova_foto.filename:
             foto_salva = salvar_foto_adolescente(nova_foto, request.form.get("nome", adolescente["nome"]))
             if foto_salva is None:
-                erro = "Foto inválida. Envie JPG, PNG ou WEBP."
+                erro = "Foto inválida. Envie JPG, JPEG ou PNG."
             else:
                 foto_path = foto_salva
         if erro:

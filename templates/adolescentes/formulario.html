@@ -9,12 +9,13 @@
 </section>
 
 <section class="card">
-    <form method="post" enctype="multipart/form-data" class="form-grid two-cols">
+    <form method="post" enctype="multipart/form-data" class="form-grid two-cols" data-foto-upload-form>
         <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
         <label class="full-span">
             Foto do adolescente {% if not adolescente %}*{% endif %}
-            <input type="file" name="foto" accept=".jpg,.jpeg,.png,.webp" {% if not adolescente %}required{% endif %}>
-            <small class="field-help">Formatos: JPG, PNG ou WEBP.</small>
+            <input type="file" name="foto" accept=".jpg,.jpeg,.png" {% if not adolescente %}required{% endif %} data-foto-input>
+            <small class="field-help">Formatos aceitos: JPG, JPEG ou PNG. Máximo: 10MB.</small>
+            <small class="field-help upload-feedback" data-upload-feedback aria-live="polite"></small>
         </label>
         <label class="full-span">
             Nome completo
@@ -53,4 +54,8 @@
         </div>
     </form>
 </section>
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="{{ url_for('static', filename='upload-foto.js') }}"></script>
 {% endblock %}

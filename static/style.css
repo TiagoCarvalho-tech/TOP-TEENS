@@ -389,6 +389,19 @@ label {
     line-height: 1.5;
 }
 
+.upload-feedback {
+    min-height: 1.2em;
+}
+
+.upload-feedback[data-state="ok"] {
+    color: var(--success);
+}
+
+.upload-feedback[data-state="error"] {
+    color: var(--danger);
+    font-weight: 700;
+}
+
 .inline-form {
     display: flex;
     align-items: center;
