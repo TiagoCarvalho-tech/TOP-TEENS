@@ -40,10 +40,22 @@ app.config["SESSION_COOKIE_HTTPONLY"] = True
 app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
 app.config["SESSION_COOKIE_SECURE"] = environ.get("TOPTEENS_HTTPS_ONLY", "0") == "1"
 app.config["PERMANENT_SESSION_LIFETIME"] = timedelta(hours=8)
-MAX_UPLOAD_MB = max(1, int(environ.get("TOPTEENS_MAX_UPLOAD_MB", "10")))
+
+
+def inteiro_positivo_ambiente(chave, padrao):
+    valor = (environ.get(chave, "") or "").strip()
+    try:
+        numero = int(valor)
+    except (TypeError, ValueError):
+        numero = padrao
+    return max(1, numero)
+
+
+MAX_UPLOAD_MB = inteiro_positivo_ambiente("TOPTEENS_MAX_UPLOAD_MB", 10)
 MAX_UPLOAD_BYTES = MAX_UPLOAD_MB * 1024 * 1024
 MAX_IMAGE_DIMENSION = 1024
 app.config["MAX_CONTENT_LENGTH"] = MAX_UPLOAD_BYTES
+app.config["MAX_FORM_MEMORY_SIZE"] = MAX_UPLOAD_BYTES + (256 * 1024)
 FASE1_SEMANAS = [
     ("Semana 1", "2026-03-15"),
     ("Semana 2", "2026-03-22"),
@@ -160,11 +172,21 @@ def extensao_foto_permitida(filename):
     return extensao in EXTENSOES_FOTO_PERMITIDAS
 
 
+def mensagem_erro_upload_foto(codigo):
+    mensagens = {
+        "FORMATO_EXTENSAO": "Foto inválida. Envie apenas JPG, JPEG ou PNG.",
+        "FORMATO_CONTEUDO": "A foto parece inválida ou corrompida. Escolha outra imagem JPG/PNG.",
+        "PROCESSAMENTO": "Não foi possível processar a foto enviada. Tente outra imagem.",
+        "SALVAR": "Não foi possível salvar a foto agora. Tente novamente em instantes.",
+    }
+    return mensagens.get(codigo, "Não foi possível processar a foto. Escolha outra imagem.")
+
+
 def salvar_foto_adolescente(arquivo, nome_base):
     if not arquivo or not arquivo.filename:
-        return ""
+        return "", None
     if not extensao_foto_permitida(arquivo.filename):
-        return None
+        return None, "FORMATO_EXTENSAO"
 
     extensao_origem = arquivo.filename.rsplit(".", 1)[1].lower()
     try:
@@ -172,7 +194,7 @@ def salvar_foto_adolescente(arquivo, nome_base):
         with Image.open(arquivo.stream) as imagem:
             formato = (imagem.format or "").upper()
             if formato not in {"JPEG", "JPG", "PNG"}:
-                return None
+                return None, "FORMATO_CONTEUDO"
 
             imagem = ImageOps.exif_transpose(imagem)
             imagem.thumbnail((MAX_IMAGE_DIMENSION, MAX_IMAGE_DIMENSION), Image.Resampling.LANCZOS)
@@ -188,12 +210,15 @@ def salvar_foto_adolescente(arquivo, nome_base):
                     imagem = imagem.convert("RGB")
                 imagem.save(conteudo, format="JPEG", quality=82, optimize=True, progressive=True)
     except (UnidentifiedImageError, OSError, ValueError):
-        return None
+        return None, "PROCESSAMENTO"
 
     nome_arquivo = secure_filename(f"{nome_slug(nome_base)}-{secrets.token_hex(8)}.{extensao_final}")
     destino = UPLOADS_DIR / nome_arquivo
-    destino.write_bytes(conteudo.getvalue())
-    return f"uploads/{nome_arquivo}"
+    try:
+        destino.write_bytes(conteudo.getvalue())
+    except OSError:
+        return None, "SALVAR"
+    return f"uploads/{nome_arquivo}", None
 
 
 @app.errorhandler(413)
@@ -727,6 +752,7 @@ def registrar_auditoria(tipo_evento, alvo_tipo, alvo_id=None, detalhes=""):
 def inject_today():
     return {
         "today": date.today().isoformat(),
+        "max_upload_mb": MAX_UPLOAD_MB,
         "csrf_token": gerar_csrf_token,
         "usuario_master": usuario_master,
     }
@@ -1163,9 +1189,12 @@ def novo_adolescente():
         erro = validar_campos_adolescente(request.form)
         foto_path = ""
         if not erro:
-            foto_path = salvar_foto_adolescente(request.files.get("foto"), request.form.get("nome", "adolescente"))
+            foto_path, erro_upload = salvar_foto_adolescente(
+                request.files.get("foto"),
+                request.form.get("nome", "adolescente"),
+            )
             if foto_path is None:
-                erro = "Foto inválida. Envie JPG, JPEG ou PNG."
+                erro = mensagem_erro_upload_foto(erro_upload)
             elif not foto_path:
                 erro = "A foto do adolescente é obrigatória."
         if erro:
@@ -1200,9 +1229,12 @@ def editar_adolescente(adolescente_id):
         foto_path = adolescente.get("foto_path", "")
         nova_foto = request.files.get("foto")
         if not erro and nova_foto and nova_foto.filename:
-            foto_salva = salvar_foto_adolescente(nova_foto, request.form.get("nome", adolescente["nome"]))
+            foto_salva, erro_upload = salvar_foto_adolescente(
+                nova_foto,
+                request.form.get("nome", adolescente["nome"]),
+            )
             if foto_salva is None:
-                erro = "Foto inválida. Envie JPG, JPEG ou PNG."
+                erro = mensagem_erro_upload_foto(erro_upload)
             else:
                 foto_path = foto_salva
         if erro:
