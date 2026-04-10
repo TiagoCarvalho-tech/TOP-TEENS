@@ -157,7 +157,7 @@ def resumo_adolescente(adolescente_id):
 def ranking_geral():
     ranking = list(mapa_pontuacao_por_adolescente().values())
     ranking.sort(
-        key=lambda item: (-item["cupons"], -item["total_pontos"], item["nome"].lower()),
+        key=lambda item: (-item["total_pontos"], item["nome"].lower()),
     )
     return ranking
 

@@ -6,13 +6,16 @@
         <p class="section-tag">Ranking</p>
         <h2>Classificação geral</h2>
     </div>
+    <div class="actions">
+        <a class="button-link" href="{{ url_for('ranking_pdf') }}">Exportar PDF</a>
+    </div>
 </section>
 
 <section class="card">
     <div class="ranking-mobile-list">
         {% for item in ranking %}
-        <article class="ranking-mobile-item {% if loop.index <= 3 %}top-{{ loop.index }}{% endif %}">
-            <div class="ranking-pos">{{ loop.index }}º</div>
+        <article class="ranking-mobile-item {% if item.posicao <= 3 %}top-{{ item.posicao }}{% endif %}">
+            <div class="ranking-pos">{{ item.posicao }}º</div>
             {% if item.foto_path %}
             <img class="ranking-photo" src="{{ url_for('static', filename=item.foto_path) }}" alt="Foto de {{ item.nome }}">
             {% else %}

@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+
+{% block content %}
+<section class="page-head">
+    <div>
+        <p class="section-tag">Mensagens</p>
+        <h2>Notificações do Líder Master</h2>
+    </div>
+</section>
+
+<section class="card">
+    <ul class="list-clean mensagens-list">
+        {% for item in mensagens %}
+        <li class="mensagem-item">
+            <p>{{ item.mensagem }}</p>
+            <small>{{ item.criado_em.strftime('%d/%m/%Y %H:%M') if item.criado_em else '-' }}</small>
+        </li>
+        {% else %}
+        <li class="mensagem-item mensagem-item-empty">Nenhuma mensagem recebida.</li>
+        {% endfor %}
+    </ul>
+</section>
+{% endblock %}

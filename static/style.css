@@ -540,6 +540,33 @@ thead th {
     border-bottom: 1px solid rgba(255, 140, 0, 0.16);
 }
 
+.mensagens-list {
+    display: grid;
+    gap: 10px;
+}
+
+.mensagens-list .mensagem-item {
+    display: grid;
+    gap: 6px;
+    padding: 12px;
+    border: 1px solid rgba(255, 140, 0, 0.18);
+    border-radius: 12px;
+    background: #fffdf8;
+}
+
+.mensagens-list .mensagem-item p {
+    margin: 0;
+    line-height: 1.5;
+}
+
+.mensagens-list .mensagem-item small {
+    color: var(--muted);
+}
+
+.mensagens-list .mensagem-item-empty {
+    color: var(--muted);
+}
+
 .ga-cards {
     display: grid;
     gap: 12px;

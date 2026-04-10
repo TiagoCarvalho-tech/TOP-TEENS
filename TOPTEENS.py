@@ -6,7 +6,8 @@ from pathlib import Path
 import re
 import secrets
 
-from flask import Flask, abort, flash, redirect, render_template, request, session, url_for
+from flask import Flask, abort, flash, make_response, redirect, render_template, request, session, url_for
+from fpdf import FPDF
 from PIL import Image, ImageOps, UnidentifiedImageError
 from werkzeug.security import check_password_hash, generate_password_hash
 from werkzeug.utils import secure_filename
@@ -75,6 +76,7 @@ ATIVIDADES_FASE = {
     "V": {"nome": "Visitante", "pontos": 1, "aliases": {"visitante"}},
     "APPS": {"nome": "APPS", "pontos": 40, "aliases": {"apps"}},
 }
+SENHA_LIDER_MASTER = "2026SA@"
 
 
 def login_obrigatorio(view):
@@ -680,6 +682,149 @@ def montar_resumo_dashboard(ranking):
     }
 
 
+def ranking_com_posicoes_por_pontos(ranking):
+    lista = []
+    posicao_atual = 0
+    ultimo_total = None
+    for item in ranking:
+        total = item.get("total_pontos", 0)
+        if ultimo_total is None or total != ultimo_total:
+            posicao_atual += 1
+            ultimo_total = total
+        novo = dict(item)
+        novo["posicao"] = posicao_atual
+        lista.append(novo)
+    return lista
+
+
+def _nome_atividade_para_codigo(nome):
+    nome_normalizado = normalizar_texto(nome).lower()
+    for codigo, dados in ATIVIDADES_FASE.items():
+        if nome_normalizado in dados["aliases"]:
+            return codigo
+    return None
+
+
+def _resumo_atividades_por_adolescente():
+    with get_connection() as connection:
+        rows = connection.execute(
+            """
+            SELECT ct.adolescente_id, a.nome AS atividade_nome
+            FROM cumprimentos_tarefas ct
+            JOIN atividades a ON a.id = ct.atividade_id
+            WHERE ct.cumpriu = 1
+            """
+        ).fetchall()
+
+    mapa = {}
+    for row in rows:
+        codigo = _nome_atividade_para_codigo(row["atividade_nome"])
+        if not codigo:
+            continue
+        adolescente_id = row["adolescente_id"]
+        mapa.setdefault(adolescente_id, set()).add(codigo)
+    return mapa
+
+
+def lider_master_autorizado():
+    return bool(session.get("lider_master_autorizado"))
+
+
+def listar_lideres_para_mensagem():
+    with get_connection() as connection:
+        return connection.execute(
+            """
+            SELECT id, nome, lider_ga
+            FROM usuarios
+            WHERE role = 'LIDER' AND aprovado = 1
+            ORDER BY lider_ga, nome
+            """
+        ).fetchall()
+
+
+def enviar_mensagem_para_lider(lider_id, mensagem):
+    with get_connection() as connection:
+        connection.execute(
+            """
+            INSERT INTO mensagens_master (lider_id, mensagem)
+            VALUES (%s, %s)
+            """,
+            (int(lider_id), (mensagem or "").strip()),
+        )
+
+
+def listar_mensagens_do_lider(lider_id):
+    with get_connection() as connection:
+        return connection.execute(
+            """
+            SELECT id, mensagem, criado_em
+            FROM mensagens_master
+            WHERE lider_id = %s
+            ORDER BY criado_em DESC, id DESC
+            """,
+            (int(lider_id),),
+        ).fetchall()
+
+
+def dados_painel_lider_master():
+    ranking = Pontuacao.ranking_geral()
+    atividades_por_adolescente = _resumo_atividades_por_adolescente()
+    ordem_codigos = ["P", "MV", "AB", "V", "APPS"]
+    painel = []
+    for item in ranking:
+        feitos = atividades_por_adolescente.get(item["id"], set())
+        atividades_feitas = [ATIVIDADES_FASE[codigo]["nome"] for codigo in ordem_codigos if codigo in feitos]
+        atividades_nao_feitas = [ATIVIDADES_FASE[codigo]["nome"] for codigo in ordem_codigos if codigo not in feitos]
+        painel.append(
+            {
+                "nome": item["nome"],
+                "lider_ga": item["lider_ga"],
+                "total_pontos": item["total_pontos"],
+                "atividades_feitas": ", ".join(atividades_feitas) if atividades_feitas else "-",
+                "atividades_nao_feitas": ", ".join(atividades_nao_feitas) if atividades_nao_feitas else "-",
+            }
+        )
+    return painel
+
+
+def _texto_pdf(valor, limite=60):
+    texto = normalizar_texto(str(valor))
+    if len(texto) > limite:
+        texto = texto[: limite - 3] + "..."
+    return texto.encode("latin-1", "replace").decode("latin-1")
+
+
+def gerar_pdf_ranking(ranking):
+    pdf = FPDF(orientation="P", unit="mm", format="A4")
+    pdf.set_auto_page_break(auto=True, margin=10)
+    pdf.add_page()
+    pdf.set_font("Helvetica", "B", 14)
+    pdf.cell(0, 8, "Nova Teens - Ranking Geral", ln=1)
+    pdf.set_font("Helvetica", "", 10)
+    pdf.cell(0, 6, f"Gerado em: {datetime.now().strftime('%d/%m/%Y %H:%M')}", ln=1)
+    pdf.ln(2)
+
+    headers = [("Posicao", 18), ("Nome", 68), ("GA", 40), ("Pontos", 30), ("Cupons", 28)]
+    pdf.set_font("Helvetica", "B", 10)
+    for titulo, largura in headers:
+        pdf.cell(largura, 8, titulo, border=1, align="C")
+    pdf.ln()
+
+    pdf.set_font("Helvetica", "", 10)
+    for item in ranking:
+        pdf.cell(18, 7, _texto_pdf(f"{item['posicao']}o", 5), border=1, align="C")
+        pdf.cell(68, 7, _texto_pdf(item["nome"], 34), border=1)
+        pdf.cell(40, 7, _texto_pdf(item["lider_ga"], 20), border=1)
+        pdf.cell(30, 7, _texto_pdf(item["total_pontos"], 8), border=1, align="C")
+        pdf.cell(28, 7, _texto_pdf(item["cupons"], 5), border=1, align="C")
+        pdf.ln()
+
+    conteudo = pdf.output(dest="S")
+    if isinstance(conteudo, str):
+        return conteudo.encode("latin-1")
+    return bytes(conteudo)
+
+
 def registrar_sessao(usuario):
     session.clear()
     session["usuario_id"] = usuario["id"]
@@ -755,6 +900,7 @@ def inject_today():
         "max_upload_mb": MAX_UPLOAD_MB,
         "csrf_token": gerar_csrf_token,
         "usuario_master": usuario_master,
+        "lider_master_autorizado": lider_master_autorizado,
     }
 
 
@@ -1754,10 +1900,95 @@ def excluir_cumprimento(cumprimento_id):
 @app.route("/ranking")
 @login_obrigatorio
 def ranking():
+    ranking_atual = ranking_com_posicoes_por_pontos(Pontuacao.ranking_geral())
     return render_template(
         "ranking.html",
-        ranking=Pontuacao.ranking_geral(),
+        ranking=ranking_atual,
     )
+
+
+@app.route("/ranking/pdf")
+@login_obrigatorio
+def ranking_pdf():
+    ranking_atual = ranking_com_posicoes_por_pontos(Pontuacao.ranking_geral())
+    conteudo = gerar_pdf_ranking(ranking_atual)
+    resposta = make_response(conteudo)
+    resposta.headers["Content-Type"] = "application/pdf"
+    resposta.headers["Content-Disposition"] = "attachment; filename=ranking-nova-teens.pdf"
+    return resposta
+
+
+@app.route("/lider-master", methods=["GET", "POST"])
+@login_obrigatorio
+def lider_master():
+    if request.method == "POST":
+        acao = request.form.get("acao", "autenticar").strip()
+        if acao == "autenticar":
+            senha_informada = request.form.get("senha_master", "")
+            if secrets.compare_digest(senha_informada, SENHA_LIDER_MASTER):
+                session["lider_master_autorizado"] = True
+                flash("Acesso Líder Master liberado.", "success")
+            else:
+                session.pop("lider_master_autorizado", None)
+                flash("Senha do Líder Master incorreta.", "danger")
+            return redirect(url_for("lider_master"))
+
+        if not lider_master_autorizado():
+            flash("Informe a senha do Líder Master para acessar o painel.", "warning")
+            return redirect(url_for("lider_master"))
+
+        if acao == "encerrar":
+            session.pop("lider_master_autorizado", None)
+            flash("Acesso Líder Master encerrado.", "info")
+            return redirect(url_for("lider_master"))
+
+        if acao == "enviar_mensagem":
+            lider_id_param = request.form.get("lider_id", "").strip()
+            mensagem = (request.form.get("mensagem", "") or "").strip()
+            if not lider_id_param.isdigit():
+                flash("Selecione um líder válido.", "danger")
+                return redirect(url_for("lider_master"))
+
+            lider_id = int(lider_id_param)
+            lideres = listar_lideres_para_mensagem()
+            lider_existe = next((item for item in lideres if item["id"] == lider_id), None)
+            if lider_existe is None:
+                flash("Líder não encontrado.", "danger")
+                return redirect(url_for("lider_master"))
+            if not mensagem:
+                flash("Digite a mensagem antes de enviar.", "danger")
+                return redirect(url_for("lider_master", lider_id=lider_id))
+            if len(mensagem) > 500:
+                flash("A mensagem deve ter no máximo 500 caracteres.", "danger")
+                return redirect(url_for("lider_master", lider_id=lider_id))
+
+            enviar_mensagem_para_lider(lider_id, mensagem)
+            flash("Mensagem enviada com sucesso.", "success")
+            return redirect(url_for("lider_master", lider_id=lider_id))
+
+    autorizado = lider_master_autorizado()
+    lideres = listar_lideres_para_mensagem() if autorizado else []
+    lider_selecionado = None
+    lider_id_param = request.args.get("lider_id", "").strip()
+    if autorizado and lider_id_param.isdigit():
+        lider_id = int(lider_id_param)
+        lider_selecionado = next((item for item in lideres if item["id"] == lider_id), None)
+
+    painel = dados_painel_lider_master() if autorizado else []
+    return render_template(
+        "lider_master.html",
+        autorizado=autorizado,
+        lideres=lideres,
+        lider_selecionado=lider_selecionado,
+        adolescentes=painel,
+    )
+
+
+@app.route("/mensagens")
+@login_obrigatorio
+def mensagens():
+    mensagens_lider = listar_mensagens_do_lider(session["usuario_id"])
+    return render_template("mensagens.html", mensagens=mensagens_lider)
 
 
 def preparar_aplicacao():

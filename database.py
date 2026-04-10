@@ -96,6 +96,16 @@ def init_db():
             )
             cursor.execute(
                 """
+                CREATE TABLE IF NOT EXISTS mensagens_master (
+                    id SERIAL PRIMARY KEY,
+                    lider_id INTEGER NOT NULL REFERENCES usuarios(id) ON DELETE CASCADE,
+                    mensagem TEXT NOT NULL,
+                    criado_em TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+                )
+                """
+            )
+            cursor.execute(
+                """
                 CREATE INDEX IF NOT EXISTS idx_adolescentes_nome
                 ON adolescentes(nome)
                 """
@@ -134,6 +144,12 @@ def init_db():
                 """
                 CREATE INDEX IF NOT EXISTS idx_auditoria_evento
                 ON auditoria_eventos(tipo_evento, criado_em DESC)
+                """
+            )
+            cursor.execute(
+                """
+                CREATE INDEX IF NOT EXISTS idx_mensagens_master_lider
+                ON mensagens_master(lider_id, criado_em DESC)
                 """
             )
 

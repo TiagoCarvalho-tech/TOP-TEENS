@@ -1,0 +1,110 @@
+{% extends "base.html" %}
+
+{% block content %}
+<section class="page-head">
+    <div>
+        <p class="section-tag">Líder Master</p>
+        <h2>Painel geral (somente visualização)</h2>
+    </div>
+</section>
+
+{% if not autorizado %}
+<section class="card">
+    <form method="post" class="form-grid">
+        <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
+        <input type="hidden" name="acao" value="autenticar">
+        <label>
+            Senha do Líder Master
+            <input type="password" name="senha_master" required>
+        </label>
+        <div class="form-actions">
+            <button type="submit">Entrar</button>
+        </div>
+    </form>
+</section>
+{% else %}
+<section class="card">
+    <div class="actions">
+        <form method="post">
+            <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
+            <input type="hidden" name="acao" value="encerrar">
+            <button type="submit">Encerrar acesso Líder Master</button>
+        </form>
+    </div>
+</section>
+
+<section class="card">
+    <h3>Enviar mensagem para líder</h3>
+    <div class="grid-two">
+        <div>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Líder</th>
+                        <th>GA</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for lider in lideres %}
+                    <tr>
+                        <td>
+                            <a href="{{ url_for('lider_master', lider_id=lider.id) }}">{{ lider.nome }}</a>
+                        </td>
+                        <td>{{ lider.lider_ga or '-' }}</td>
+                    </tr>
+                    {% else %}
+                    <tr><td colspan="2">Nenhum líder disponível.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        <div>
+            <form method="post" class="form-grid">
+                <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
+                <input type="hidden" name="acao" value="enviar_mensagem">
+                <label>
+                    Líder selecionado
+                    <input type="text" value="{{ lider_selecionado.nome if lider_selecionado else 'Selecione um líder na lista' }}" readonly>
+                </label>
+                <input type="hidden" name="lider_id" value="{{ lider_selecionado.id if lider_selecionado else '' }}">
+                <label>
+                    Mensagem
+                    <textarea name="mensagem" rows="5" maxlength="500" required></textarea>
+                </label>
+                <div class="form-actions">
+                    <button type="submit" {% if not lider_selecionado %}disabled{% endif %}>Enviar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</section>
+
+<section class="card">
+    <h3>Todos os adolescentes e atividades</h3>
+    <table>
+        <thead>
+            <tr>
+                <th>Nome do adolescente</th>
+                <th>GA</th>
+                <th>Pontuação</th>
+                <th>Atividades feitas</th>
+                <th>Atividades não feitas</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for item in adolescentes %}
+            <tr>
+                <td>{{ item.nome }}</td>
+                <td>{{ item.lider_ga }}</td>
+                <td>{{ item.total_pontos }} pts</td>
+                <td>{{ item.atividades_feitas }}</td>
+                <td>{{ item.atividades_nao_feitas }}</td>
+            </tr>
+            {% else %}
+            <tr><td colspan="5">Nenhum adolescente cadastrado.</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</section>
+{% endif %}
+{% endblock %}
