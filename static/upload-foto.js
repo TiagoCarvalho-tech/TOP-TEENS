@@ -156,6 +156,7 @@
         setFeedback("", null);
         if (!file) {
             clearPreview();
+            setFeedback("", null);
             return;
         }
 
@@ -213,10 +214,13 @@
                 "ok",
             );
         } catch (error) {
-            if (error.message === "READ_ERROR" || error.message === "INVALID_DIMENSIONS") {
+            if ((error.message === "READ_ERROR" || error.message === "INVALID_DIMENSIONS") && file.size <= MAX_UPLOAD_BYTES) {
+                clearPreview();
+                setFeedback("Seu navegador não conseguiu gerar a prévia, mas a foto será enviada normalmente.", "ok");
+            } else if (error.message === "READ_ERROR" || error.message === "INVALID_DIMENSIONS") {
                 input.value = "";
                 clearPreview();
-                setFeedback(`${mensagemErroProcessamento(error.message)} Escolha outra imagem JPG/PNG.`, "error");
+                setFeedback(`${mensagemErroProcessamento(error.message)} Escolha uma imagem menor que ${maxUploadMb}MB.`, "error");
             } else if (file.size <= MAX_UPLOAD_BYTES) {
                 showPreview(file);
                 setFeedback(`${mensagemErroProcessamento(error.message)} O arquivo original será enviado.`, "ok");
