@@ -55,7 +55,8 @@ def inteiro_positivo_ambiente(chave, padrao):
 MAX_UPLOAD_MB = inteiro_positivo_ambiente("TOPTEENS_MAX_UPLOAD_MB", 10)
 MAX_UPLOAD_BYTES = MAX_UPLOAD_MB * 1024 * 1024
 MAX_IMAGE_DIMENSION = 1024
-app.config["MAX_CONTENT_LENGTH"] = MAX_UPLOAD_BYTES
+# Margem para multipart/form-data (headers + boundaries), evitando falso 413.
+app.config["MAX_CONTENT_LENGTH"] = MAX_UPLOAD_BYTES + (2 * 1024 * 1024)
 app.config["MAX_FORM_MEMORY_SIZE"] = MAX_UPLOAD_BYTES + (256 * 1024)
 FASE1_SEMANAS = [
     ("Semana 1", "2026-03-15"),
@@ -177,7 +178,8 @@ def extensao_foto_permitida(filename):
 def mensagem_erro_upload_foto(codigo):
     mensagens = {
         "FORMATO_EXTENSAO": "Foto inválida. Envie apenas JPG, JPEG ou PNG.",
-        "FORMATO_CONTEUDO": "A foto parece inválida ou corrompida. Escolha outra imagem JPG/PNG.",
+        "FORMATO_CONTEUDO": "A foto enviada não pôde ser reconhecida como imagem válida.",
+        "LIMITE": f"Arquivo muito grande. O limite é {MAX_UPLOAD_MB}MB.",
         "PROCESSAMENTO": "Não foi possível processar a foto enviada. Tente outra imagem.",
         "SALVAR": "Não foi possível salvar a foto agora. Tente novamente em instantes.",
     }
@@ -190,14 +192,21 @@ def salvar_foto_adolescente(arquivo, nome_base):
     if not extensao_foto_permitida(arquivo.filename):
         return None, "FORMATO_EXTENSAO"
 
+    try:
+        arquivo.stream.seek(0, 2)
+        tamanho_original = arquivo.stream.tell()
+        arquivo.stream.seek(0)
+        if tamanho_original > MAX_UPLOAD_BYTES:
+            return None, "LIMITE"
+    except OSError:
+        arquivo.stream.seek(0)
+
     extensao_origem = arquivo.filename.rsplit(".", 1)[1].lower()
     try:
         arquivo.stream.seek(0)
         with Image.open(arquivo.stream) as imagem:
-            formato = (imagem.format or "").upper()
-            if formato not in {"JPEG", "JPG", "PNG"}:
-                return None, "FORMATO_CONTEUDO"
-
+            # Tenta decodificar de fato para evitar falso positivo de arquivo inválido.
+            imagem.load()
             imagem = ImageOps.exif_transpose(imagem)
             imagem.thumbnail((MAX_IMAGE_DIMENSION, MAX_IMAGE_DIMENSION), Image.Resampling.LANCZOS)
 
@@ -211,7 +220,9 @@ def salvar_foto_adolescente(arquivo, nome_base):
                 if imagem.mode != "RGB":
                     imagem = imagem.convert("RGB")
                 imagem.save(conteudo, format="JPEG", quality=82, optimize=True, progressive=True)
-    except (UnidentifiedImageError, OSError, ValueError):
+    except UnidentifiedImageError:
+        return None, "FORMATO_CONTEUDO"
+    except (OSError, ValueError):
         return None, "PROCESSAMENTO"
 
     nome_arquivo = secure_filename(f"{nome_slug(nome_base)}-{secrets.token_hex(8)}.{extensao_final}")

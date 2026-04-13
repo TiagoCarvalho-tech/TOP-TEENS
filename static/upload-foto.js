@@ -213,7 +213,11 @@
                 "ok",
             );
         } catch (error) {
-            if (file.size <= MAX_UPLOAD_BYTES) {
+            if (error.message === "READ_ERROR" || error.message === "INVALID_DIMENSIONS") {
+                input.value = "";
+                clearPreview();
+                setFeedback(`${mensagemErroProcessamento(error.message)} Escolha outra imagem JPG/PNG.`, "error");
+            } else if (file.size <= MAX_UPLOAD_BYTES) {
                 showPreview(file);
                 setFeedback(`${mensagemErroProcessamento(error.message)} O arquivo original será enviado.`, "ok");
             } else {
