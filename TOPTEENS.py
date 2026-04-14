@@ -5,6 +5,7 @@ from os import environ
 from pathlib import Path
 import re
 import secrets
+import traceback
 
 from flask import Flask, abort, flash, make_response, redirect, render_template, request, session, url_for
 from fpdf import FPDF
@@ -1364,15 +1365,19 @@ def novo_adolescente():
             dados["lider_ga"] = obter_lider_ga_usuario()
             dados["lider_id"] = session.get("usuario_id")
             dados["foto_path"] = foto_path
-            adolescente = Adolescente.cadastrar_adolescente(dados)
-            registrar_auditoria(
-                "cadastro_adolescente",
-                "adolescente",
-                adolescente["id"],
-                f"Matrícula {adolescente['matricula']}.",
-            )
-            flash(f"Adolescente cadastrado com matrícula {adolescente['matricula']}.", "success")
-            return redirect(url_for("listar_adolescentes"))
+            try:
+                adolescente = Adolescente.cadastrar_adolescente(dados)
+                registrar_auditoria(
+                    "cadastro_adolescente",
+                    "adolescente",
+                    adolescente["id"],
+                    f"Matrícula {adolescente['matricula']}.",
+                )
+                flash(f"Adolescente cadastrado com matrícula {adolescente['matricula']}.", "success")
+                return redirect(url_for("listar_adolescentes"))
+            except Exception:
+                traceback.print_exc()
+                flash("Não foi possível concluir o cadastro agora. Tente novamente.", "danger")
     return render_template("adolescentes/formulario.html", adolescente=None)
 
 
@@ -1407,15 +1412,19 @@ def editar_adolescente(adolescente_id):
             dados["lider_ga"] = adolescente["lider_ga"] if usuario_master() else obter_lider_ga_usuario()
             dados["lider_id"] = adolescente.get("lider_id") or session.get("usuario_id")
             dados["foto_path"] = foto_path
-            Adolescente.atualizar_adolescente(adolescente_id, dados)
-            registrar_auditoria(
-                "edicao_adolescente",
-                "adolescente",
-                adolescente_id,
-                f"Cadastro de {adolescente['nome']} atualizado.",
-            )
-            flash("Cadastro atualizado com sucesso.", "success")
-            return redirect(url_for("listar_adolescentes"))
+            try:
+                Adolescente.atualizar_adolescente(adolescente_id, dados)
+                registrar_auditoria(
+                    "edicao_adolescente",
+                    "adolescente",
+                    adolescente_id,
+                    f"Cadastro de {adolescente['nome']} atualizado.",
+                )
+                flash("Cadastro atualizado com sucesso.", "success")
+                return redirect(url_for("listar_adolescentes"))
+            except Exception:
+                traceback.print_exc()
+                flash("Não foi possível atualizar o cadastro agora. Tente novamente.", "danger")
 
     return render_template("adolescentes/formulario.html", adolescente=adolescente)
 

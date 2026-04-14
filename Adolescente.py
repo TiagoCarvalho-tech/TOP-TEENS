@@ -1,16 +1,30 @@
 from datetime import date, datetime
 import re
 
+from psycopg.errors import UniqueViolation
+
 from database import get_connection
 
 
 def gerar_matricula(connection):
     ano_atual = datetime.now().year
     cursor = connection.execute(
-        "SELECT COUNT(*) AS total FROM adolescentes WHERE matricula LIKE %s",
+        """
+        SELECT COALESCE(
+            MAX(
+                CASE
+                    WHEN matricula ~ '^[0-9]{8}$' THEN CAST(RIGHT(matricula, 4) AS INTEGER)
+                    ELSE 0
+                END
+            ),
+            0
+        ) AS ultimo
+        FROM adolescentes
+        WHERE matricula LIKE %s
+        """,
         (f"{ano_atual}%",),
     )
-    sequencia = cursor.fetchone()["total"] + 1
+    sequencia = cursor.fetchone()["ultimo"] + 1
     return f"{ano_atual}{sequencia:04d}"
 
 
@@ -88,28 +102,34 @@ def obter_adolescente(adolescente_id):
 
 def cadastrar_adolescente(dados):
     with get_connection() as connection:
-        matricula = gerar_matricula(connection)
-        adolescente = connection.execute(
-            """
-            INSERT INTO adolescentes (
-                lider_id, matricula, foto_path, nome, nascimento, contato, sexo, pai, mae, lider_ga
-            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-            RETURNING id, matricula
-            """,
-            (
-                int(dados["lider_id"]) if str(dados.get("lider_id", "")).isdigit() else None,
-                matricula,
-                dados.get("foto_path", "").strip(),
-                normalizar_nome(dados["nome"]),
-                dados["nascimento"],
-                normalizar_contato(dados.get("contato", "")),
-                dados["sexo"],
-                normalizar_nome(dados.get("responsavel", "")),
-                "",
-                normalizar_nome(dados["lider_ga"]),
-            ),
-        ).fetchone()
-    return adolescente
+        for _ in range(8):
+            matricula = gerar_matricula(connection)
+            try:
+                adolescente = connection.execute(
+                    """
+                    INSERT INTO adolescentes (
+                        lider_id, matricula, foto_path, nome, nascimento, contato, sexo, pai, mae, lider_ga
+                    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                    RETURNING id, matricula
+                    """,
+                    (
+                        int(dados["lider_id"]) if str(dados.get("lider_id", "")).isdigit() else None,
+                        matricula,
+                        dados.get("foto_path", "").strip(),
+                        normalizar_nome(dados["nome"]),
+                        dados["nascimento"],
+                        normalizar_contato(dados.get("contato", "")),
+                        dados["sexo"],
+                        normalizar_nome(dados.get("responsavel", "")),
+                        "",
+                        normalizar_nome(dados["lider_ga"]),
+                    ),
+                ).fetchone()
+                return adolescente
+            except UniqueViolation:
+                connection.rollback()
+                continue
+    raise RuntimeError("Não foi possível gerar matrícula única para o adolescente.")
 
 
 def atualizar_adolescente(adolescente_id, dados):
