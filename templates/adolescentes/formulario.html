@@ -12,9 +12,9 @@
     <form method="post" enctype="multipart/form-data" class="form-grid two-cols" data-foto-upload-form data-max-upload-mb="{{ max_upload_mb }}">
         <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
         <label class="full-span">
-            Foto do adolescente {% if not adolescente %}*{% endif %}
-            <input type="file" name="foto" accept=".jpg,.jpeg,.png" {% if not adolescente %}required{% endif %} data-foto-input>
-            <small class="field-help">Formatos aceitos: JPG, JPEG ou PNG. Máximo: {{ max_upload_mb }}MB.</small>
+            Foto do adolescente (opcional)
+            <input type="file" name="foto" accept=".jpg,.jpeg,.png" data-foto-input>
+            <small class="field-help">Formatos aceitos: JPG, JPEG ou PNG. Máximo: {{ max_upload_mb }}MB. Você pode adicionar a foto agora ou depois na edição.</small>
             <small class="field-help upload-feedback" data-upload-feedback aria-live="polite"></small>
             <div class="upload-preview" data-upload-preview>
                 <img data-upload-preview-image src="" alt="Prévia da foto selecionada" hidden>

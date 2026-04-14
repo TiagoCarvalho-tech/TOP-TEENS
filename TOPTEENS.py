@@ -224,6 +224,8 @@ def salvar_foto_adolescente(arquivo, nome_base):
         return None, "FORMATO_CONTEUDO"
     except (OSError, ValueError):
         return None, "PROCESSAMENTO"
+    except Exception:
+        return None, "PROCESSAMENTO"
 
     nome_arquivo = secure_filename(f"{nome_slug(nome_base)}-{secrets.token_hex(8)}.{extensao_final}")
     destino = UPLOADS_DIR / nome_arquivo
@@ -1346,14 +1348,15 @@ def novo_adolescente():
         erro = validar_campos_adolescente(request.form)
         foto_path = ""
         if not erro:
-            foto_path, erro_upload = salvar_foto_adolescente(
-                request.files.get("foto"),
-                request.form.get("nome", "adolescente"),
-            )
+            try:
+                foto_path, erro_upload = salvar_foto_adolescente(
+                    request.files.get("foto"),
+                    request.form.get("nome", "adolescente"),
+                )
+            except Exception:
+                foto_path, erro_upload = None, "PROCESSAMENTO"
             if foto_path is None:
                 erro = mensagem_erro_upload_foto(erro_upload)
-            elif not foto_path:
-                erro = "A foto do adolescente é obrigatória."
         if erro:
             flash(erro, "danger")
         else:
@@ -1386,10 +1389,13 @@ def editar_adolescente(adolescente_id):
         foto_path = adolescente.get("foto_path", "")
         nova_foto = request.files.get("foto")
         if not erro and nova_foto and nova_foto.filename:
-            foto_salva, erro_upload = salvar_foto_adolescente(
-                nova_foto,
-                request.form.get("nome", adolescente["nome"]),
-            )
+            try:
+                foto_salva, erro_upload = salvar_foto_adolescente(
+                    nova_foto,
+                    request.form.get("nome", adolescente["nome"]),
+                )
+            except Exception:
+                foto_salva, erro_upload = None, "PROCESSAMENTO"
             if foto_salva is None:
                 erro = mensagem_erro_upload_foto(erro_upload)
             else:
